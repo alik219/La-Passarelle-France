@@ -4,18 +4,21 @@ A free, open-source speaking tutor for the **TCF Canada** oral exam. You talk wi
 **Madame Claire**, an AI tutor who answers in natural French and gives you brief
 corrections as you go.
 
-> Status: milestone 1 of 5. Text conversation works, with live corrections, an English
-> translation of every reply (on click), a Hint button, your level (A1–C1) and tu/vous.
-> Voice, the animated tutor and progress memory are coming in later milestones.
+> Status: milestone 4 of 5. Talk with an animated Claire by voice or text: she lip-syncs
+> her replies, blinks and reacts, and you answer with your microphone. You get live
+> corrections, an English translation of every reply (on click), a Hint button, your
+> level (A1–C1, which also sets how much Claire says) and tu/vous. Sessions are saved with
+> a short note from Claire, your weak points are tracked, and Claire quietly practises
+> them with you. More practice modes are coming next.
 
 ## What it costs: nothing
 
 | Part | What we use | Cost |
 |---|---|---|
 | Tutor brain | [Groq](https://console.groq.com)'s free API (`openai/gpt-oss-120b`), with Ollama or Gemini as an automatic backup | $0 |
-| Claire's voice *(milestone 2)* | [edge-tts](https://github.com/rany2/edge-tts) (Microsoft Edge neural voices) | $0 |
-| Hearing you *(milestone 2)* | Your browser's Web Speech API (Chrome or Edge) | $0 |
-| Animated tutor *(milestone 3)* | Hand-drawn SVG, animated in the browser | $0 |
+| Claire's voice | [edge-tts](https://github.com/rany2/edge-tts) (Microsoft Edge neural voices) | $0 |
+| Hearing you | Whisper (`whisper-large-v3`) on Groq's free API, works in any browser | $0 |
+| Animated tutor | Hand-drawn SVG, animated in the browser (lip-sync from her voice) | $0 |
 | Hosting | Runs on your own computer | $0 |
 
 Notes:
@@ -28,7 +31,12 @@ Notes:
   `gemini-2.5-flash`), and Google may use free-tier conversations to improve its models.
 - Pick the main AI with `LLM_PROVIDER` and the backup with `LLM_FALLBACK` in `.env`.
 - edge-tts uses Microsoft Edge's public read-aloud service. It's free but unofficial, so it could change.
-- Your practice history is saved only on your own computer (`sessions/`, which git ignores).
+- Your recorded answers are sent to Groq to be written down, then discarded by this app.
+  Whisper writes what you actually said, mistakes included, so Claire can correct them.
+- Your practice history is saved only on your own computer, as JSON files in `sessions/`
+  (git ignores it). Weak points come from the corrections in your last 5 sessions, and
+  **Reset progress** on the home page deletes them all. Each finished session uses one extra
+  AI request for Claire's note.
 
 ## Run it
 
@@ -83,9 +91,9 @@ Icons are names from [lucide](https://lucide.dev/icons) (for example `message-ci
 ## Roadmap
 
 1. ~~Skeleton, design and text conversation with corrections~~
-2. Claire speaks; you answer with your microphone
-3. Animated Claire (lip-sync, blinking)
-4. Saved sessions and a "weak points" memory
+2. ~~Claire speaks; you answer with your microphone~~
+3. ~~Animated Claire (lip-sync, blinking)~~
+4. ~~Saved sessions and a "weak points" memory~~
 5. Timed Exam, Feedback Report and Vocabulary Drill modes
 
 ## Credits

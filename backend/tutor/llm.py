@@ -31,12 +31,12 @@ CORRECTION_SCHEMA = {
             "description": "One short plain-English sentence explaining the actual mistake "
             "in 'original' and the rule. Max 20 words.",
         },
+        # Not an "enum": if the model invents a category, strict schema checking would
+        # reject the whole reply. normalize_category() maps it afterwards instead.
         "category": {
             "type": "string",
-            "enum": [
-                "tense", "conjugation", "word_choice", "agreement", "gender",
-                "preposition", "article", "elision", "english_word", "other",
-            ],
+            "description": "One of: tense, conjugation, word_choice, agreement, gender, "
+            "preposition, article, elision, english_word, other.",
         },
     },
     "required": ["original", "corrected", "explanation", "category"],
@@ -46,11 +46,23 @@ CORRECTION_SCHEMA = {
 REPLY_SCHEMA = {
     "type": "object",
     "properties": {
+        # Decided first, so the model checks for speech-recognition slips before correcting.
+        "misheard": {
+            "anyOf": [
+                {
+                    "type": "string",
+                    "description": "A word or phrase from the student's latest message that is not "
+                    "real French or makes no sense there, most likely a speech-recognition error "
+                    "(e.g. « anglo-lodgique »). Copy it exactly.",
+                },
+                {"type": "null"},
+            ]
+        },
         "reply": {"type": "string"},
         "correction": {"anyOf": [CORRECTION_SCHEMA, {"type": "null"}]},
         "hint": {"type": "string"},
     },
-    "required": ["reply", "correction", "hint"],
+    "required": ["misheard", "reply", "correction", "hint"],
     "additionalProperties": False,
 }
 
@@ -58,6 +70,34 @@ TRANSLATE_PROMPT = (
     "Translate the user's French text into natural, simple English. "
     "Reply with the translation only, no quotes or notes."
 )
+
+
+CATEGORIES = {
+    "tense", "conjugation", "word_choice", "agreement", "gender",
+    "preposition", "article", "elision", "english_word", "other",
+}
+
+# Categories models sometimes invent, mapped to the nearest one we track.
+CATEGORY_SYNONYMS = {
+    "vocabulary": "word_choice", "lexical": "word_choice", "word": "word_choice",
+    "anglicism": "english_word", "english": "english_word", "loanword": "english_word",
+    "verb_tense": "tense", "verb": "conjugation", "verb_form": "conjugation",
+    "mood": "tense", "subjunctive": "tense",
+    "accord": "agreement", "plural": "agreement", "number": "agreement",
+    "determiner": "article", "contraction": "elision",
+}
+
+
+def normalize_category(raw: str) -> str:
+    key = (raw or "").strip().lower().replace(" ", "_").replace("-", "_")
+    if key in CATEGORIES:
+        return key
+    if key in CATEGORY_SYNONYMS:
+        return CATEGORY_SYNONYMS[key]
+    for word, category in CATEGORY_SYNONYMS.items():  # e.g. "verb_tense_error"
+        if word in key:
+            return category
+    return "other"  # spelling, word order, pronouns, ... still saved, just grouped
 
 
 class LLMError(Exception):
@@ -117,11 +157,15 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
         raise LLMError("Claire's answer had the wrong shape. Try sending your message again.")
 
     correction = data.get("correction")
+    misheard = (data.get("misheard") or "").strip().lower()
+    if misheard and isinstance(correction, dict) and misheard in (correction.get("original") or "").lower():
+        correction = None  # don't "correct" what was really a listening error
     if isinstance(correction, dict) and (correction.get("corrected") or "").strip():
         correction = {
             k: (correction.get(k) or "").strip()
             for k in ("original", "corrected", "explanation", "category")
         }
+        correction["category"] = normalize_category(correction["category"])
     else:
         correction = None
     return {
@@ -129,6 +173,29 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
         "correction": correction,
         "hint": (data.get("hint") or "").strip(),
     }
+
+
+NOTE_PROMPT = """You are Madame Claire, a warm French tutor. Your student (level {level}) just
+finished a speaking practice session for the TCF Canada exam. From the corrections below,
+write a note IN ENGLISH of 2 or 3 short sentences: what they did well, the one or two things
+to work on next (be concrete, e.g. "use the passé composé for finished actions"), and one
+encouraging tip. You only saw their words as text, so never comment on pronunciation or
+accent. Plain text only: no lists, no markdown, no greeting or sign-off."""
+
+
+async def session_note(level: str, corrections: list[dict], messages_sent: int) -> str:
+    """Claire's 2-3 line "what to work on next" note for the end of a session."""
+    if corrections:
+        listing = "\n".join(
+            f"- [{c.get('category', 'other')}] « {c.get('original', '')} » → « {c.get('corrected', '')} »"
+            f" ({c.get('explanation', '')})"
+            for c in corrections[:15]
+        )
+    else:
+        listing = "(no corrections: every message was correct)"
+    user = f"Messages sent: {messages_sent}\nCorrections:\n{listing}"
+    out = await _complete(NOTE_PROMPT.format(level=level), [("user", user)], None)
+    return out.strip()
 
 
 async def translate(text: str) -> str:
@@ -175,10 +242,12 @@ async def _groq(system: str, turns: list[tuple[str, str]], schema: dict | None) 
             body["response_format"] = {"type": "json_object"}
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            for _attempt in range(2):
+            for _attempt in range(3):
                 resp = await client.post(GROQ_URL, json=body, headers={"Authorization": f"Bearer {key}"})
-                # In loose JSON mode the model occasionally drifts into plain text; one retry fixes it.
-                if not (resp.status_code == 400 and "json_validate_failed" in resp.text):
+                # The model occasionally produces text or JSON that doesn't fit the format
+                # (more often in long replies). Groq then returns 400 with "failed_generation";
+                # asking again almost always works.
+                if not (resp.status_code == 400 and "failed_generation" in resp.text):
                     break
     except httpx.HTTPError as exc:
         raise LLMError(f"Couldn't reach Groq ({type(exc).__name__}). Check your internet connection.", status=503) from exc
@@ -189,6 +258,8 @@ async def _groq(system: str, turns: list[tuple[str, str]], schema: dict | None) 
         raise LLMError("Groq's free limit was reached. Wait a little and try again.", status=429)
     if resp.status_code >= 500:
         raise LLMError("Groq is having trouble right now. Try again in a moment.", status=503)
+    if resp.status_code == 400 and "failed_generation" in resp.text:
+        raise LLMError("Claire got mixed up writing her answer. Please send your message again.", status=502)
     if resp.status_code >= 400:
         raise LLMError(f"Groq error {resp.status_code}: {resp.text[:300]}")
     try:

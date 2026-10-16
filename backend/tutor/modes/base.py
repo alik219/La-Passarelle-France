@@ -23,15 +23,28 @@ LEVEL_GUIDE: dict[str, str] = {
     "C1": "The student is advanced (C1). Speak naturally, with idiomatic expressions and nuance.",
 }
 
+# How much Claire says per turn (only the last sentence may be a question). Beginners need short, clear turns; advanced students
+# benefit from hearing more natural French, as a TCF examiner would speak.
+LENGTH_GUIDE: dict[str, str] = {
+    "A1": "Reply length: 1 or 2 very short sentences, at most 20 words.",
+    "A2": "Reply length: 1 or 2 short sentences, at most 30 words.",
+    "B1": "Reply length: 2 or 3 sentences, at most 45 words: react, add a short comment of "
+    "your own, then ask your question.",
+    "B2": "Reply length: 3 or 4 sentences, at most 65 words: react, share a brief opinion, "
+    "example or personal anecdote, then ask your question.",
+    "C1": "Reply length: 3 to 5 sentences, at most 85 words: react with nuance, share a "
+    "considered opinion or anecdote using rich connectors, then ask your question.",
+}
+
 ADDRESS_GUIDE: dict[str, str] = {
     "vous": "Address the student with « vous » (formal, as in the exam).",
     "tu": "Address the student with « tu » (casual, friendly).",
 }
 
 CONVERSATION_RULES = """Conversation rules (strict):
-- "reply" is AT MOST 2 short sentences and at most 30 words in total: one brief reaction,
-  then EXACTLY ONE question. Never ask two things at once (no "ou ... ?" alternatives,
-  no second question mark).
+- "reply" respects the length limit for the student's level (see "Reply length") and
+  ends with EXACTLY ONE question. Never ask two things at once (no "ou ... ?"
+  alternatives, no second question mark).
 - If the student did not really answer your last question (they only greeted you, changed
   the subject, or answered something else), kindly re-ask the same question in simpler
   words instead of moving on.
@@ -59,6 +72,11 @@ CORRECTION_RULES = """Corrections: check the student's latest message word by wo
     article, elision, english_word, other (the most important mistake).
 - Ignore missing accents, capitalisation and punctuation (the student may be typing or
   using speech recognition).
+- Speech recognition sometimes mishears a word, producing something that isn't French
+  or makes no sense in context (e.g. « anglo-lodgique »). That is NOT the student's
+  mistake: put it in "misheard", do not correct it and do not guess what they meant.
+  Your reply then briefly asks what they meant by that word (that is your one question).
+  Otherwise set "misheard" to null.
 - If there is no real mistake, set "correction" to null. Do not invent corrections."""
 
 OUTPUT_RULES = """Other fields:
@@ -88,17 +106,24 @@ class Mode:
     ) -> str:
         parts = [
             CLAIRE,
-            LEVEL_GUIDE[level] + " " + ADDRESS_GUIDE[address],
+            LEVEL_GUIDE[level] + " " + ADDRESS_GUIDE[address] + "\n" + LENGTH_GUIDE[level]
+            + " All sentences are statements except the LAST one, which is your single question.",
             self.instructions,
-            CONVERSATION_RULES,
-            CORRECTION_RULES,
-            OUTPUT_RULES,
         ]
         if weak_points:
+            # Right after the mode's own instructions, so it takes priority over the topic order.
             parts.append(
-                "Recurring mistakes from earlier sessions (gently create chances to practise these):\n- "
+                "The student's most frequent mistakes in recent sessions:\n- "
                 + "\n- ".join(weak_points)
+                + "\nThis matters more than the usual topic order: at least every second question "
+                "(including this one, unless you must re-ask) should make the student USE these points. For verb tense, ask about past events (what they "
+                "did last weekend, how they arrived in Canada, a memorable trip); for English words, "
+                "ask about their work or studies so they need French vocabulary; for agreement or "
+                "gender, ask them to describe people, places or things. Weave it in naturally after "
+                "reacting to what they said. Never mention this list and never announce what you "
+                "are practising."
             )
+        parts += [CONVERSATION_RULES, CORRECTION_RULES, OUTPUT_RULES]
         return "\n\n".join(parts)
 
     def public(self) -> dict:

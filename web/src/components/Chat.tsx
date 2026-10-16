@@ -1,6 +1,7 @@
-import { CornerDownLeft, HelpCircle, Languages, Lightbulb, Mic, Send, Volume2, X } from "lucide-react";
+import { CornerDownLeft, HelpCircle, Languages, Lightbulb, Loader2, Mic, Send, Square, Volume2, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { translate, type Correction } from "../api";
+import { transcribe, translate, type Correction } from "../api";
+import { useRecorder } from "../hooks/useRecorder";
 
 const CATEGORY_LABEL: Record<string, string> = {
   tense: "Verb tense",
@@ -127,7 +128,13 @@ function TranslatePopup({ text, initial }: { text: string; initial?: string }) {
   );
 }
 
-export function ChatMessage({ message }: { message: Message }) {
+type ChatMessageProps = {
+  message: Message;
+  speaking?: boolean; // Claire is saying this message right now
+  onSpeak?: (text: string) => void;
+};
+
+export function ChatMessage({ message, speaking = false, onSpeak }: ChatMessageProps) {
   if (message.role === "learner") {
     return (
       <div className="msg msg--learner">
@@ -144,11 +151,19 @@ export function ChatMessage({ message }: { message: Message }) {
       <div className="msg__who">
         <span className="avatar avatar--tutor">C</span> Claire
       </div>
-      <div className="bubble bubble--tutor">
-        <span>{message.text}</span>
+      <div className={`bubble bubble--tutor${speaking ? " is-speaking" : ""}`}>
+        <span lang="fr">{message.text}</span>
         <div className="bubble__tools">
           <TranslatePopup text={message.text} initial={message.translation} />
-          <Volume2 size={15} className="bubble__audio" aria-hidden="true" />
+          <button
+            type="button"
+            className="bubble__audio"
+            onClick={() => onSpeak?.(message.text)}
+            aria-label={speaking ? "Claire is speaking" : "Hear Claire say this"}
+            title="Play again"
+          >
+            <Volume2 size={15} />
+          </button>
         </div>
       </div>
     </div>
@@ -174,13 +189,40 @@ type ComposerProps = {
   disabled: boolean;
   hint?: string; // sentence starter for answering Claire's latest question
   onSend: (text: string) => void;
-  onMic: () => void;
+  onRecordStart?: () => void; // e.g. stop Claire talking while you speak
+  onRecordingChange?: (recording: boolean) => void;
 };
 
-export function Composer({ disabled, hint, onSend, onMic }: ComposerProps) {
+export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingChange }: ComposerProps) {
   const [text, setText] = useState("");
   const [showHint, setShowHint] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // What you said goes into the box (after anything already typed) so you can check it first.
+  const recorder = useRecorder(async (audio) => {
+    setTranscribing(true);
+    setMicError(null);
+    try {
+      const heard = await transcribe(audio);
+      setText((t) => (t.trim() ? `${t.trim()} ${heard}` : heard));
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch (e) {
+      setMicError((e as Error).message);
+    } finally {
+      setTranscribing(false);
+    }
+  });
+  const recording = recorder.state === "recording";
+  useEffect(() => onRecordingChange?.(recording), [recording, onRecordingChange]);
+
+  function toggleMic() {
+    if (recording) return recorder.stop();
+    onRecordStart?.();
+    setMicError(null);
+    void recorder.start();
+  }
 
   // Each new question from Claire starts with the hint hidden again.
   useEffect(() => setShowHint(false), [hint]);
@@ -230,11 +272,24 @@ export function Composer({ disabled, hint, onSend, onMic }: ComposerProps) {
         </div>
       )}
       <div className="composer__box">
-        <button type="button" className="composer__mic" onClick={onMic} aria-label="Answer with your microphone">
-          <Mic size={18} />
+        <button
+          type="button"
+          className={`composer__mic${recording ? " is-recording" : ""}`}
+          onClick={toggleMic}
+          disabled={transcribing}
+          aria-pressed={recording}
+          aria-label={recording ? "Stop recording" : "Answer with your microphone"}
+        >
+          {transcribing ? <Loader2 size={18} className="spin" /> : recording ? <Square size={15} /> : <Mic size={18} />}
         </button>
         <label className="composer__field">
-          <span className="composer__label">Type or use the microphone…</span>
+          <span className="composer__label" aria-live="polite">
+            {recording
+              ? `Recording… ${recorder.seconds}s · tap the square when you're done`
+              : transcribing
+                ? "Writing down what you said…"
+                : "Type or use the microphone…"}
+          </span>
           <textarea
             ref={inputRef}
             rows={1}
@@ -250,6 +305,11 @@ export function Composer({ disabled, hint, onSend, onMic }: ComposerProps) {
           <Send size={17} />
         </button>
       </div>
+      {(micError || recorder.error) && (
+        <p className="composer__error" role="alert">
+          {micError || recorder.error}
+        </p>
+      )}
       <p className="composer__hint">Press Enter to send · Your conversations stay private</p>
     </form>
   );

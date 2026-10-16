@@ -6,6 +6,7 @@ import { Logo, TricoloreStripe } from "../components/Brand";
 import Claire from "../components/Claire";
 import LevelPicker from "../components/LevelPicker";
 import ModeCard from "../components/ModeCard";
+import ProgressPanel from "../components/ProgressPanel";
 import ThemeToggle from "../components/ThemeToggle";
 import { useLevel } from "../settings";
 
@@ -96,6 +97,8 @@ export default function Landing() {
             </div>
           </div>
         </section>
+
+        <ProgressPanel />
 
         <section className="modes" id="modes">
           <div className="modes__head">

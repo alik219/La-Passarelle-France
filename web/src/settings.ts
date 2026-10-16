@@ -38,3 +38,4 @@ function useStoredChoice<T extends string>(key: string, allowed: readonly T[], f
 
 export const useLevel = () => useStoredChoice<Level>("pf-level", LEVELS, "A2");
 export const useAddress = () => useStoredChoice<Address>("pf-address", ["vous", "tu"], "vous");
+export const useSound = () => useStoredChoice<"on" | "off">("pf-sound", ["on", "off"], "on");
