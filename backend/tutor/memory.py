@@ -9,7 +9,7 @@ import json
 import os
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 SESSIONS_DIR = Path(
@@ -58,7 +58,16 @@ def _all_sessions() -> list[dict]:
             sessions.append(json.loads(file.read_text(encoding="utf-8")))
         except (OSError, json.JSONDecodeError):
             continue  # skip a damaged file rather than break the whole page
-    return sorted(sessions, key=lambda s: s.get("started_at", ""), reverse=True)
+    return sorted(sessions, key=_started, reverse=True)
+
+
+def _started(session: dict) -> datetime:
+    """When a session started, as a comparable time (local-offset and older UTC "Z" formats)."""
+    try:
+        t = datetime.fromisoformat(session["started_at"].replace("Z", "+00:00"))
+        return t if t.tzinfo else t.astimezone()
+    except (KeyError, ValueError, AttributeError):
+        return datetime.min.replace(tzinfo=datetime.now().astimezone().tzinfo)
 
 
 def corrections_of(session: dict) -> list[dict]:
@@ -72,10 +81,9 @@ def stats(session: dict) -> dict:
     learner = [m for m in session.get("messages", []) if m.get("role") == "learner"]
     by_category = Counter(c.get("category") or "other" for c in corrections_of(session))
     try:
-        seconds = (
-            datetime.fromisoformat(session["ended_at"]) - datetime.fromisoformat(session["started_at"])
-        ).total_seconds()
-    except (KeyError, ValueError):
+        ended = datetime.fromisoformat(session["ended_at"].replace("Z", "+00:00"))
+        seconds = (ended - _started(session)).total_seconds()
+    except (KeyError, ValueError, AttributeError, TypeError):
         seconds = 0
     return {
         "id": session.get("id"),
@@ -133,6 +141,108 @@ def reset() -> int:
         file.unlink(missing_ok=True)
         removed += 1
     return removed
+
+
+def _day(session: dict):
+    """The local calendar day a session started (older exams were saved in UTC)."""
+    if not session.get("started_at"):
+        return None
+    started = _started(session)
+    return None if started.year == 1 else started.astimezone().date()
+
+
+def _streak(days: set) -> int:
+    """Days in a row with practice, ending today (or yesterday, if not practised yet today)."""
+    day = date.today()
+    if day not in days:
+        day -= timedelta(days=1)
+    count = 0
+    while day in days:
+        count += 1
+        day -= timedelta(days=1)
+    return count
+
+
+def report(period_days: int | None) -> dict:
+    """Numbers for the Feedback Report: stats, exam scores and mistakes over a period.
+
+    `period_days` = 7 or 30 for the last N days (today included), None for all time.
+    Counting only; no AI.
+    """
+    everything = list(reversed(_all_sessions()))  # oldest first
+    start = date.today() - timedelta(days=period_days - 1) if period_days else None
+    sessions = [s for s in everything if (d := _day(s)) and (start is None or d >= start)]
+
+    # Mistake categories are coloured by their all-time rank, so switching the period
+    # never repaints a category in another colour.
+    all_time = Counter(c.get("category") or "other" for s in everything for c in corrections_of(s))
+    colour_order = [cat for cat, _ in all_time.most_common() if cat != "other"]
+
+    # Time buckets: days for the last 7 days; weeks (starting Monday) for longer periods, since
+    # people rarely practise every day and daily points would mostly be zeros.
+    first = start or (_day(sessions[0]) if sessions else date.today())
+    span = (date.today() - first).days + 1
+    weekly = period_days != 7 and span > 7
+    if weekly:
+        first -= timedelta(days=first.weekday())
+        span = (date.today() - first).days + 1  # recount from the Monday, so this week is included
+    step = 7 if weekly else 1
+    buckets = [first + timedelta(days=i) for i in range(0, max(span, 1), step)]
+
+    def bucket_of(d):
+        return (d - first).days // step
+
+    per_bucket = [Counter() for _ in buckets]
+    per_category = Counter()
+    examples: dict[str, dict] = {}
+    seconds = messages = 0
+    exams = []
+    for s in sessions:
+        st = stats(s)
+        seconds += st["duration_seconds"]
+        messages += st["messages_sent"]
+        idx = bucket_of(_day(s))
+        for c in corrections_of(s):
+            cat = c.get("category") or "other"
+            if 0 <= idx < len(per_bucket):
+                per_bucket[idx][cat] += 1
+            per_category[cat] += 1
+            examples[cat] = {"original": c.get("original", ""), "corrected": c.get("corrected", "")}  # latest wins
+        if s.get("exam"):
+            ex = s["exam"]
+            exams.append({
+                "date": s.get("started_at"),
+                "score": ex.get("score"),
+                "nclc": ex.get("nclc"),
+                "tasks": {str(t["task"]): t["score"] for t in ex.get("tasks", [])},
+            })
+
+    categories = sorted(per_category, key=lambda c: (-per_category[c], c))
+    return {
+        "period_days": period_days,
+        "stats": {
+            "seconds": seconds,
+            "sessions": len(sessions),
+            "conversations": sum(1 for s in sessions if not s.get("exam")),
+            "exams": len(exams),
+            "messages": messages,
+            "corrections": sum(per_category.values()),
+            "active_days": len({_day(s) for s in sessions}),
+            "streak": _streak({_day(s) for s in everything}),
+        },
+        "exams": exams,
+        "mistakes": {
+            "weekly": weekly,
+            "buckets": [b.isoformat() for b in buckets],
+            "series": {cat: [b.get(cat, 0) for b in per_bucket] for cat in categories},
+            "categories": [
+                {"category": cat, "label": CATEGORY_LABELS.get(cat, cat), "count": per_category[cat],
+                 "example": examples.get(cat, {"original": "", "corrected": ""})}
+                for cat in categories
+            ],
+            "colour_order": colour_order,
+        },
+    }
 
 
 def focus_for_prompt(points: list[dict]) -> list[str]:

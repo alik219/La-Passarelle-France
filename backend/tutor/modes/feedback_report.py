@@ -7,6 +7,6 @@ MODE = Mode(
     icon="target",
     heading="Your progress",
     instructions="Mode: feedback report (not built yet).",
-    enabled=False,
+    enabled=True,  # a report page (GET /api/report), not a conversation
     order=30,
 )

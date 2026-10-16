@@ -17,6 +17,7 @@ import Claire, { type Mood } from "../components/Claire";
 import ThemeToggle from "../components/ThemeToggle";
 import { useTutorVoice } from "../hooks/useTutorVoice";
 import { useSound } from "../settings";
+import { localIso } from "../time";
 
 /**
  * TCF Canada speaking test simulation: the 3 tasks (or one), each on a strict timer, with
@@ -141,7 +142,7 @@ function Exam({ onRestart }: { onRestart: () => void }) {
       // Save after every task, so a finished task is never lost.
       const saved = await saveExam({
         id: examId,
-        started_at: startedAt.toISOString(),
+        started_at: localIso(startedAt),
         practice_mode: practice,
         tasks: records.current,
       }).catch(() => null);

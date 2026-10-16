@@ -13,6 +13,7 @@ type Props = {
 export function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
+  if (m >= 60) return `${Math.floor(m / 60)} h ${m % 60} min`;
   return m ? `${m} min${s >= 30 ? " 30 s" : ""}` : `${s} s`;
 }
 

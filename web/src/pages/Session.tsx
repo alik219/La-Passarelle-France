@@ -1,9 +1,11 @@
 import { Sparkles, Target, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   chat,
+  getFocus,
   getModes,
+  type Focus,
   getProgress,
   saveSession,
   saveSessionOnClose,
@@ -20,6 +22,7 @@ import LevelPicker from "../components/LevelPicker";
 import ThemeToggle from "../components/ThemeToggle";
 import { useTutorVoice } from "../hooks/useTutorVoice";
 import { useAddress, useLevel, useSound } from "../settings";
+import { localIso } from "../time";
 
 type Status = "listening" | "thinking";
 
@@ -67,22 +70,23 @@ function Session({ onRestart }: { onRestart: () => void }) {
     );
   }, [modeId, navigate]);
 
+  // "Practise this" from the Feedback Report: ?focus=tense etc. Claire then works openly on it.
+  const [searchParams] = useSearchParams();
+  const focusKey = searchParams.get("focus");
+  const [practiceFocus, setPracticeFocus] = useState<Focus | null>(null);
+  useEffect(() => {
+    if (!focusKey) return;
+    getFocus(focusKey, address).then(setPracticeFocus, () => setPracticeFocus(null));
+  }, [focusKey, address]);
+
   // Claire's greeting; switching tu/vous before you've answered re-greets you in that form.
   useEffect(() => {
-    if (!mode) return;
-    setMessages((m) =>
-      m.length > 1
-        ? m
-        : [
-            {
-              role: "tutor",
-              text: mode.opening[address],
-              translation: mode.opening_translation,
-              hint: mode.opening_hint,
-            },
-          ],
-    );
-  }, [mode, address]);
+    if (!mode || (focusKey && !practiceFocus)) return;
+    const opening = practiceFocus
+      ? { text: practiceFocus.opening, translation: practiceFocus.opening_translation, hint: practiceFocus.opening_hint }
+      : { text: mode.opening[address], translation: mode.opening_translation, hint: mode.opening_hint };
+    setMessages((m) => (m.length > 1 ? m : [{ role: "tutor", ...opening }]));
+  }, [mode, address, focusKey, practiceFocus]);
 
   const lastTutor = [...messages].reverse().find((m) => m.role === "tutor");
 
@@ -182,6 +186,7 @@ function Session({ onRestart }: { onRestart: () => void }) {
         next.map(({ role, text }) => ({ role, text })),
         level,
         address,
+        practiceFocus?.category,
       );
       const learnerIndex = next.length - 1;
       setMessages((m) => [
@@ -249,7 +254,17 @@ function Session({ onRestart }: { onRestart: () => void }) {
             <span className={`dot ${shownStatus === "thinking" ? "dot--amber" : shownStatus === "speaking" ? "dot--bleu" : "dot--vert"}`} />{" "}
             {STATUS_LABEL[shownStatus]}
           </p>
-          {focus.length > 0 ? (
+          {practiceFocus ? (
+            <div className="tip focus">
+              <p className="tip__title">
+                <Target size={14} /> Focused practice
+              </p>
+              <p>
+                Every question today is a chance to practise <strong>{practiceFocus.label.toLowerCase()}</strong>. Claire
+                still corrects any mistake.
+              </p>
+            </div>
+          ) : focus.length > 0 ? (
             <div className="tip focus">
               <p className="tip__title">
                 <Target size={14} /> Today's focus
@@ -278,7 +293,9 @@ function Session({ onRestart }: { onRestart: () => void }) {
           <div className="conversation__head">
             <div>
               <p className="eyebrow">Conversation</p>
-              <h1 className="section-title section-title--sm">{mode?.heading ?? ""}</h1>
+              <h1 className="section-title section-title--sm">
+                {practiceFocus ? `Focus: ${practiceFocus.label}` : (mode?.heading ?? "")}
+              </h1>
             </div>
             <button
               type="button"
@@ -324,14 +341,6 @@ function Session({ onRestart }: { onRestart: () => void }) {
       )}
     </div>
   );
-}
-
-/** Timestamp with the local time-zone offset, e.g. 2026-10-16T15:04:05-04:00. */
-function localIso(d: Date) {
-  const off = -d.getTimezoneOffset();
-  const pad = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, "0");
-  const local = new Date(d.getTime() + off * 60_000).toISOString().slice(0, 19);
-  return `${local}${off >= 0 ? "+" : "-"}${pad(off / 60)}:${pad(off % 60)}`;
 }
 
 function useElapsed(since: Date) {

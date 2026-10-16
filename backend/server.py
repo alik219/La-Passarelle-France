@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from tutor import exam, memory  # noqa: E402
+from tutor import exam, focus, memory  # noqa: E402
 from tutor.llm import (  # noqa: E402  (needs .env loaded first)
     LLMError,
     exam_evaluate,
@@ -59,6 +59,7 @@ class ChatRequest(BaseModel):
     history: list[Turn] = Field(max_length=200)
     level: Level = "A2"
     address: Address = "vous"
+    focus: str | None = Field(default=None, max_length=32)  # "Practise this" from the report
 
 
 @app.get("/api/modes")
@@ -73,8 +74,11 @@ async def chat(req: ChatRequest):
         raise HTTPException(404, f"Unknown or unavailable mode: {req.mode}")
     try:
         # Claire quietly gives you chances to practise your top 3 recent weak points.
-        focus = memory.focus_for_prompt(memory.weak_points(top=3))
-        system = mode.system_prompt(level=req.level, address=req.address, weak_points=focus)
+        if req.focus in focus.FOCUS:
+            system = mode.system_prompt(level=req.level, address=req.address, focus=focus.prompt(req.focus))
+        else:
+            weak = memory.focus_for_prompt(memory.weak_points(top=3))
+            system = mode.system_prompt(level=req.level, address=req.address, weak_points=weak)
         return await tutor_reply(system, [t.model_dump() for t in req.history])
     except LLMError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
@@ -182,6 +186,24 @@ def progress():
 @app.delete("/api/progress")
 def reset_progress():
     return {"removed": memory.reset()}
+
+
+# ---------- Feedback Report ----------
+
+@app.get("/api/report")
+def feedback_report(period: str = "30"):
+    """Stats, exam scores and mistakes for the last 7 or 30 days, or all time. No AI."""
+    if period not in ("7", "30", "all"):
+        raise HTTPException(422, "period must be 7, 30 or all")
+    return memory.report(None if period == "all" else int(period))
+
+
+@app.get("/api/focus/{category}")
+def focus_opening(category: str, address: Address = "vous"):
+    """Claire's opening for a focused practice session ("Practise this")."""
+    if category not in focus.FOCUS:
+        raise HTTPException(404, "Unknown mistake type.")
+    return focus.public(category, address)
 
 
 # ---------- TCF Canada timed exam ----------

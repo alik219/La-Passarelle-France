@@ -102,7 +102,11 @@ class Mode:
     order: int = 100  # position of the card on the landing page
 
     def system_prompt(
-        self, level: Level = "A2", address: Address = "vous", weak_points: list[str] | None = None
+        self,
+        level: Level = "A2",
+        address: Address = "vous",
+        weak_points: list[str] | None = None,
+        focus: str | None = None,  # an openly chosen focus (see tutor/focus.py) replaces weak points
     ) -> str:
         parts = [
             CLAIRE,
@@ -110,7 +114,9 @@ class Mode:
             + " All sentences are statements except the LAST one, which is your single question.",
             self.instructions,
         ]
-        if weak_points:
+        if focus:
+            parts.append(focus)
+        elif weak_points:
             # Right after the mode's own instructions, so it takes priority over the topic order.
             parts.append(
                 "The student's most frequent mistakes in recent sessions:\n- "

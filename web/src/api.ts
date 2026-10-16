@@ -124,6 +124,45 @@ export const saveSessionOnClose = (session: SessionToSave) =>
 
 export const getProgress = () => request<Progress>("/api/progress");
 
+// ---------- Feedback Report ----------
+
+export type ReportPeriod = "7" | "30" | "all";
+
+export type Report = {
+  period_days: number | null;
+  stats: {
+    seconds: number;
+    sessions: number;
+    conversations: number;
+    exams: number;
+    messages: number;
+    corrections: number;
+    active_days: number;
+    streak: number;
+  };
+  exams: { date: string; score: number; nclc: string; tasks: Record<string, number> }[];
+  mistakes: {
+    weekly: boolean;
+    buckets: string[]; // ISO dates: each day, or the Monday of each week
+    series: Record<string, number[]>; // category -> count per bucket
+    categories: (CategoryCount & { example: { original: string; corrected: string } })[];
+    colour_order: string[]; // all-time ranking, so a category keeps its colour across periods
+  };
+};
+
+export const getReport = (period: ReportPeriod) => request<Report>(`/api/report?period=${period}`);
+
+export type Focus = {
+  category: string;
+  label: string;
+  opening: string;
+  opening_translation: string;
+  opening_hint: string;
+};
+
+export const getFocus = (category: string, address: Address) =>
+  request<Focus>(`/api/focus/${encodeURIComponent(category)}?address=${address}`);
+
 // ---------- TCF Canada timed exam ----------
 
 export type ExamItem = { id: string; fr: string; en: string; role?: string };
@@ -171,9 +210,9 @@ export const saveExam = (exam: {
 
 export const resetProgress = () => request<{ removed: number }>("/api/progress", { method: "DELETE" });
 
-export const chat = (mode: string, history: Turn[], level: Level, address: Address) =>
+export const chat = (mode: string, history: Turn[], level: Level, address: Address, focus?: string | null) =>
   request<TutorReply>("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode, history, level, address }),
+    body: JSON.stringify({ mode, history, level, address, focus: focus ?? null }),
   });

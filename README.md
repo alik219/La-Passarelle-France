@@ -10,8 +10,26 @@ corrections as you go.
 > level (A1–C1, which also sets how much Claire says) and tu/vous. Sessions are saved with
 > a short note from Claire, your weak points are tracked, and Claire quietly practises
 > them with you. **New:** a timed TCF Canada speaking-test simulation (all 3 tasks or one),
-> with an estimated score /20 and NCLC level after each task. Feedback Report and
-> Vocabulary Drill are coming next.
+> with an estimated score /20 and NCLC level after each task, and a **Feedback Report**
+> with your practice stats, exam score trend and mistake trends. Vocabulary Drill is next.
+
+## Feedback Report
+
+Pick **Feedback Report** on the home page to see your progress for the **last 7 days, last
+30 days or all time**:
+
+- **Practice stats:** time practised, sessions (conversations and exams), messages sent,
+  corrections (and how many per 10 messages), and your day streak.
+- **TCF exam scores:** your overall and per-task scores over time. The gridlines mark the
+  NCLC levels.
+- **Mistakes over time:** corrections per mistake type, by day for the last 7 days and by
+  week for longer periods.
+- **Your mistake types:** each type with its count and latest example. **Practise this**
+  starts a Free Conversation where Claire works openly on that one point.
+- **Print / save as PDF** gives a clean printable version.
+
+Charts work with the keyboard (left and right arrow keys) and have a **Show as table**
+view. The report is counted from your saved sessions and uses **no AI requests**.
 
 ## Timed exam (TCF Canada speaking test)
 
@@ -117,7 +135,7 @@ Icons are names from [lucide](https://lucide.dev/icons) (for example `message-ci
 2. ~~Claire speaks; you answer with your microphone~~
 3. ~~Animated Claire (lip-sync, blinking)~~
 4. ~~Saved sessions and a "weak points" memory~~
-5. ~~Timed Exam (TCF Canada simulation)~~, then Feedback Report and Vocabulary Drill
+5. ~~Timed Exam (TCF Canada simulation)~~, ~~Feedback Report~~, then Vocabulary Drill
 
 ## Credits
 
