@@ -1,0 +1,20 @@
+# Secrets: each person keeps their own key here
+.env
+
+# Personal practice history stays on your own computer
+sessions/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / Vite
+node_modules/
+web/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/

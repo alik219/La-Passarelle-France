@@ -1,0 +1,71 @@
+/* Design tokens taken from the Figma Make draft (2026-10-16). */
+:root {
+  --font-serif: "DM Serif Display", Georgia, serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+
+  --bleu: #002654;
+  --rouge: #ce1126;
+  --vert: #16865b;
+
+  --bg: #fbf6ec;
+  --bg-alt: #fffdf9;
+  --card: #fffdf9;
+  --ink: #142033;
+  --heading: #002654;
+  --muted: #667085;
+  --faint: #9db0c4;
+  --border: #ded8ce;
+  --panel: #e9eef4;
+  --ring: #ccd8e5;
+  --chip: #e7eef7;
+  --band: #002654;
+  --band-ink: #ffffff;
+  --band-muted: #b8c6d8;
+  --footer: #001a3a;
+
+  --bubble-tutor: #ffffff;
+  --bubble-tutor-ink: #142033;
+  --bubble-learner: #002654;
+  --bubble-learner-ink: #ffffff;
+  --correction-bg: #fbe7e9;
+  --correction-ink: #142033;
+
+  --btn-primary: #002654;
+  --btn-primary-ink: #ffffff;
+  --shadow: 0 1px 2px rgba(20, 32, 51, 0.04), 0 8px 24px rgba(20, 32, 51, 0.06);
+  --radius: 10px;
+  --radius-lg: 18px;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1828;
+  --bg-alt: #0f1c2f;
+  --card: #15243a;
+  --ink: #e6ecf4;
+  --heading: #e6ecf4;
+  --muted: #9aa8bb;
+  --faint: #5c6f88;
+  --border: #24364f;
+  --panel: #11203a;
+  --ring: #22385a;
+  --chip: #1c2f4c;
+  --band: #091426;
+  --band-ink: #e6ecf4;
+  --band-muted: #9aa8bb;
+  --footer: #070f1d;
+
+  --bubble-tutor: #15243a;
+  --bubble-tutor-ink: #e6ecf4;
+  --bubble-learner: #8fb4e8;
+  --bubble-learner-ink: #0d1828;
+  --correction-bg: #3a1823;
+  --correction-ink: #f4cdd3;
+
+  --btn-primary: #e6ecf4;
+  --btn-primary-ink: #0d1828;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  color-scheme: dark;
+}
