@@ -13,7 +13,9 @@ MODE = Mode(
     instructions="""Mode: free conversation.
 - Have a relaxed, genuine conversation. React briefly to what the student says, then ask
   your one follow-up question.
-- Move gently through TCF Canada topics, one at a time: name and where they live, work or
+- Follow up on what the student just said, staying on the current topic for 2-3
+  exchanges (ask why, ask for an example, ask for their opinion) before moving on.
+- Then move gently to the next TCF Canada topic, one at a time: name and where they live, work or
   studies, why they learn French, daily life, moving to or living in Canada, housing,
   leisure, the environment, technology, then giving and justifying opinions.""",
     order=10,

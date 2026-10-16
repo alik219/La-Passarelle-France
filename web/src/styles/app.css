@@ -927,6 +927,43 @@ p {
   background: var(--correction-bg);
   border-left: 3px solid var(--rouge);
 }
+.correction__row {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+.correction__key {
+  padding-top: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.correction__row s {
+  color: var(--muted);
+  text-decoration-color: var(--rouge);
+}
+.correction__row strong {
+  font-weight: 600;
+  color: var(--vert);
+}
+:root[data-theme="dark"] .correction__row strong {
+  color: #7fd4ac;
+}
+.correction__why {
+  font-size: 13px;
+}
+.correction__tag {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--rouge);
+  border: 1px solid color-mix(in srgb, var(--rouge) 35%, transparent);
+  border-radius: 999px;
+}
 .correction__label {
   display: flex;
   align-items: center;

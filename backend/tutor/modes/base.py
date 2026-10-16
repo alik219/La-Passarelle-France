@@ -45,11 +45,18 @@ CORRECTION_RULES = """Corrections: check the student's latest message word by wo
   -> « j'ai vu un film hier »), conjugation, gender and agreement, missing elision
   (« parce que on » -> « parce qu'on »), prepositions, and word choice or anglicisms
   (« économiser du temps » -> « gagner du temps »).
-- If you find mistakes, set "correction" to ONE short tip in French starting with
-  "Astuce : " that quotes the corrected wording in « guillemets ». With several mistakes,
-  fix the most important one in this order: verb tense, conjugation, word choice,
-  agreement, then small slips. Add a very short English gloss in parentheses only if the
-  rule is tricky.
+  English words dropped into a French sentence also count: give the French word.
+- If you find mistakes, fill "correction" for a learner who may not understand French
+  explanations:
+  - "original": the exact words from the student's message that are wrong (a short
+    fragment, copied as written).
+  - "corrected": the student's WHOLE sentence rewritten correctly in natural French,
+    keeping their meaning. Fix every mistake in it, and give ONE version only (never
+    "ou" alternatives).
+  - "explanation": ONE short, plain sentence IN ENGLISH saying why (max 20 words), e.g.
+    "Use « comme » before a job, with no article."
+  - "category": one of tense, conjugation, word_choice, agreement, gender, preposition,
+    article, elision, english_word, other (the most important mistake).
 - Ignore missing accents, capitalisation and punctuation (the student may be typing or
   using speech recognition).
 - If there is no real mistake, set "correction" to null. Do not invent corrections."""

@@ -12,7 +12,35 @@ REPLY_SCHEMA = {
     "type": "OBJECT",
     "properties": {
         "reply": {"type": "STRING"},
-        "correction": {"type": "STRING", "nullable": True},
+        "correction": {
+            "type": "OBJECT",
+            "nullable": True,
+            "properties": {
+                "original": {
+                    "type": "STRING",
+                    "description": "Only the wrong words, copied exactly from the student's message.",
+                },
+                "corrected": {
+                    "type": "STRING",
+                    "description": "The student's ENTIRE message rewritten in correct French "
+                    "(every sentence, not just the wrong part). One version only.",
+                },
+                "explanation": {
+                    "type": "STRING",
+                    "description": "One short plain-English sentence explaining the actual "
+                    "mistake in 'original' and the rule. Max 20 words.",
+                },
+                "category": {
+                    "type": "STRING",
+                    "enum": [
+                        "tense", "conjugation", "word_choice", "agreement", "gender",
+                        "preposition", "article", "elision", "english_word", "other",
+                    ],
+                },
+            },
+            "required": ["original", "corrected", "explanation", "category"],
+            "propertyOrdering": ["original", "corrected", "explanation", "category"],
+        },
         "translation": {"type": "STRING"},
         "hint": {"type": "STRING"},
     },
@@ -47,7 +75,13 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
             "and put it in .env as GEMINI_API_KEY.",
             status=503,
         )
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # Free-tier quotas are per model (gemini-2.5-flash allows only ~20 requests a day), so
+    # when the main model is out of quota or busy, Claire answers with the fallback model.
+    models = [os.getenv("GEMINI_MODEL", "gemini-2.5-flash")]
+    fallback = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+    if fallback and fallback not in models:
+        models.append(fallback)
+    thinking = int(os.getenv("GEMINI_THINKING_BUDGET", "512"))
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": _to_contents(history),
@@ -55,23 +89,29 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
             "temperature": 0.6,
             # Safety net only. The prompt keeps replies to 1-2 sentences; a tighter cap
             # would cut the JSON (reply + correction + translation + hint) mid-way.
-            "maxOutputTokens": 400,
+            "maxOutputTokens": 600 + thinking,
             "responseMimeType": "application/json",
             "responseSchema": REPLY_SCHEMA,
-            # Skip "thinking" so replies come back fast enough for conversation.
-            "thinkingConfig": {"thinkingBudget": 0},
+            # A little "thinking" makes corrections much more accurate; kept small so
+            # replies still come back fast enough for conversation.
+            "thinkingConfig": {"thinkingBudget": thinking},
         },
     }
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            API_URL.format(model=model), json=body, headers={"x-goog-api-key": key}
-        )
+        for model in models:
+            resp = await client.post(
+                API_URL.format(model=model), json=body, headers={"x-goog-api-key": key}
+            )
+            if resp.status_code not in (429, 503):
+                break  # success, or an error a different model wouldn't fix
     if resp.status_code == 429:
-        raise LLMError(
-            "Gemini's free-tier limit was reached (too many messages this minute, or today's "
-            "quota). Wait a minute and try again.",
-            status=429,
-        )
+        if "PerDay" in resp.text:
+            msg = "You've used today's free Gemini quota. It resets at midnight Pacific time."
+        else:
+            msg = "Too many messages in the last minute for Gemini's free tier. Wait a minute and try again."
+        raise LLMError(msg, status=429)
+    if resp.status_code == 503:
+        raise LLMError("Gemini is very busy right now. Try again in a moment.", status=503)
     if resp.status_code >= 400:
         detail = resp.json().get("error", {}).get("message", resp.text) if resp.content else ""
         raise LLMError(f"Gemini error {resp.status_code}: {detail}")
@@ -82,7 +122,11 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
     except (KeyError, IndexError, json.JSONDecodeError) as exc:
         raise LLMError(f"Unexpected Gemini response: {exc}") from exc
 
-    correction = (data.get("correction") or "").strip() or None
+    correction = data.get("correction")
+    if not (isinstance(correction, dict) and (correction.get("corrected") or "").strip()):
+        correction = None
+    else:
+        correction = {k: (correction.get(k) or "").strip() for k in ("original", "corrected", "explanation", "category")}
     return {
         "reply": data.get("reply", "").strip(),
         "correction": correction,

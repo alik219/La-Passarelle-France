@@ -14,9 +14,16 @@ export type Mode = {
 
 export type Turn = { role: "tutor" | "learner"; text: string };
 
+export type Correction = {
+  original: string; // the wrong words, as the learner wrote them
+  corrected: string; // the learner's whole message, fixed
+  explanation: string; // why, in plain English
+  category: string; // tense, word_choice, ... (for the future feedback report)
+};
+
 export type TutorReply = {
   reply: string;
-  correction: string | null;
+  correction: Correction | null;
   translation: string;
   hint: string;
 };

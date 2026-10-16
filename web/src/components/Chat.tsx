@@ -1,10 +1,51 @@
 import { CornerDownLeft, HelpCircle, Languages, Lightbulb, Mic, Send, Volume2, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import type { Correction } from "../api";
+
+const CATEGORY_LABEL: Record<string, string> = {
+  tense: "Verb tense",
+  conjugation: "Conjugation",
+  word_choice: "Word choice",
+  agreement: "Agreement",
+  gender: "Gender",
+  preposition: "Preposition",
+  article: "Article",
+  elision: "Elision",
+  english_word: "English word",
+};
+
+function CorrectionCard({ correction }: { correction: Correction }) {
+  const tag = CATEGORY_LABEL[correction.category];
+  return (
+    <div className="correction">
+      <p className="correction__label">
+        <Lightbulb size={13} /> Quick correction
+        {tag && <span className="correction__tag">{tag}</span>}
+      </p>
+      {correction.original && (
+        <p className="correction__row">
+          <span className="correction__key">You wrote</span>
+          <s>{correction.original}</s>
+        </p>
+      )}
+      <p className="correction__row">
+        <span className="correction__key">Better</span>
+        <strong lang="fr">{correction.corrected}</strong>
+      </p>
+      {correction.explanation && (
+        <p className="correction__row correction__why">
+          <span className="correction__key">Why</span>
+          <span>{correction.explanation}</span>
+        </p>
+      )}
+    </div>
+  );
+}
 
 export type Message = {
   role: "tutor" | "learner";
   text: string;
-  correction?: string | null; // on learner messages: Claire's tip about that message
+  correction?: Correction | null; // on learner messages: Claire's fix for that message
   translation?: string; // on tutor messages
   hint?: string; // on tutor messages: a starter for answering
 };
@@ -64,14 +105,7 @@ export function ChatMessage({ message }: { message: Message }) {
           Vous <span className="avatar avatar--learner">V</span>
         </div>
         <div className="bubble bubble--learner">{message.text}</div>
-        {message.correction && (
-          <div className="correction">
-            <p className="correction__label">
-              <Lightbulb size={13} /> Quick correction
-            </p>
-            <p>{message.correction}</p>
-          </div>
-        )}
+        {message.correction && <CorrectionCard correction={message.correction} />}
       </div>
     );
   }
