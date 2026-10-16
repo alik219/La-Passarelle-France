@@ -59,7 +59,13 @@ function TranslatePopup({ text, initial }: { text: string; initial?: string }) {
   const [translation, setTranslation] = useState(initial ?? "");
   const [failed, setFailed] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
   const id = useId();
+
+  // Keep the popup fully visible inside the scrolling chat.
+  useEffect(() => {
+    if (open) popRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [open, translation, failed]);
 
   useEffect(() => {
     if (!open || translation) return;
@@ -101,7 +107,7 @@ function TranslatePopup({ text, initial }: { text: string; initial?: string }) {
         <Languages size={14} /> EN
       </button>
       {open && (
-        <div className="translate__pop" id={id} role="dialog" aria-label="English translation">
+        <div className="translate__pop" id={id} ref={popRef} role="dialog" aria-label="English translation">
           <div className="translate__head">
             <span>In English</span>
             <button type="button" onClick={() => setOpen(false)} aria-label="Close translation">
