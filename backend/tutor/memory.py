@@ -62,7 +62,9 @@ def _all_sessions() -> list[dict]:
 
 
 def corrections_of(session: dict) -> list[dict]:
-    return [m["correction"] for m in session.get("messages", []) if isinstance(m.get("correction"), dict)]
+    """Corrections attached to messages, plus those from an exam's end-of-task feedback."""
+    inline = [m["correction"] for m in session.get("messages", []) if isinstance(m.get("correction"), dict)]
+    return inline + [c for c in session.get("extra_corrections", []) if isinstance(c, dict)]
 
 
 def stats(session: dict) -> dict:
@@ -88,6 +90,7 @@ def stats(session: dict) -> dict:
             for cat, n in by_category.most_common()
         ],
         "note": session.get("note"),
+        "exam": session.get("exam"),  # score and NCLC for exam simulations, else None
     }
 
 

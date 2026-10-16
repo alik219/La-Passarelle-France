@@ -15,7 +15,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   english_word: "English word",
 };
 
-function CorrectionCard({ correction }: { correction: Correction }) {
+export function CorrectionCard({ correction }: { correction: Correction }) {
   const tag = CATEGORY_LABEL[correction.category];
   return (
     <div className="correction">
@@ -132,9 +132,10 @@ type ChatMessageProps = {
   message: Message;
   speaking?: boolean; // Claire is saying this message right now
   onSpeak?: (text: string) => void;
+  allowTranslate?: boolean; // false in exam mode
 };
 
-export function ChatMessage({ message, speaking = false, onSpeak }: ChatMessageProps) {
+export function ChatMessage({ message, speaking = false, onSpeak, allowTranslate = true }: ChatMessageProps) {
   if (message.role === "learner") {
     return (
       <div className="msg msg--learner">
@@ -154,7 +155,7 @@ export function ChatMessage({ message, speaking = false, onSpeak }: ChatMessageP
       <div className={`bubble bubble--tutor${speaking ? " is-speaking" : ""}`}>
         <span lang="fr">{message.text}</span>
         <div className="bubble__tools">
-          <TranslatePopup text={message.text} initial={message.translation} />
+          {allowTranslate && <TranslatePopup text={message.text} initial={message.translation} />}
           <button
             type="button"
             className="bubble__audio"
@@ -191,9 +192,10 @@ type ComposerProps = {
   onSend: (text: string) => void;
   onRecordStart?: () => void; // e.g. stop Claire talking while you speak
   onRecordingChange?: (recording: boolean) => void;
+  closed?: boolean; // answering is over (exam time's up): stop recording, no more input
 };
 
-export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingChange }: ComposerProps) {
+export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingChange, closed = false }: ComposerProps) {
   const [text, setText] = useState("");
   const [showHint, setShowHint] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -216,6 +218,12 @@ export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingCha
   });
   const recording = recorder.state === "recording";
   useEffect(() => onRecordingChange?.(recording), [recording, onRecordingChange]);
+
+  // When answering closes for good (an exam task's time is up), stop any recording in progress.
+  const { stop: stopRecording } = recorder;
+  useEffect(() => {
+    if (closed && recording) stopRecording();
+  }, [closed, recording, stopRecording]);
 
   function toggleMic() {
     if (recording) return recorder.stop();
@@ -276,7 +284,7 @@ export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingCha
           type="button"
           className={`composer__mic${recording ? " is-recording" : ""}`}
           onClick={toggleMic}
-          disabled={transcribing}
+          disabled={transcribing || closed}
           aria-pressed={recording}
           aria-label={recording ? "Stop recording" : "Answer with your microphone"}
         >

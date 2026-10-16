@@ -92,6 +92,7 @@ export type SessionStats = {
   corrections: number;
   by_category: CategoryCount[];
   note: string | null;
+  exam: { score: number; nclc: string; practice_mode: boolean } | null;
 };
 
 export type WeakPoint = CategoryCount & { example: { original: string; corrected: string } };
@@ -122,6 +123,51 @@ export const saveSessionOnClose = (session: SessionToSave) =>
   );
 
 export const getProgress = () => request<Progress>("/api/progress");
+
+// ---------- TCF Canada timed exam ----------
+
+export type ExamItem = { id: string; fr: string; en: string; role?: string };
+
+export type ExamTask = {
+  task: 1 | 2 | 3;
+  title: string;
+  title_fr: string;
+  instructions: string;
+  talk_seconds: number;
+  prep_seconds: number;
+  item: ExamItem | null;
+  opening: string;
+  opening_translation: string;
+};
+
+export type ExamPlan = { tasks: ExamTask[]; closing: string; closing_translation: string };
+
+export type TaskResult = {
+  task: number;
+  score: number; // out of 20
+  nclc: string;
+  strengths: string[];
+  improvements: string[];
+  corrections: Correction[];
+};
+
+export const getExamPlan = (tasks: number[]) => request<ExamPlan>(`/api/exam/plan?tasks=${tasks.join(",")}`);
+
+const postJson = <T,>(path: string, body: unknown) =>
+  request<T>(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+export const examTurn = (task: number, itemId: string | null, history: Turn[]) =>
+  postJson<{ reply: string; hint: string }>("/api/exam/turn", { task, item_id: itemId, history });
+
+export const examEvaluate = (task: number, itemId: string | null, history: Turn[]) =>
+  postJson<TaskResult>("/api/exam/evaluate", { task, item_id: itemId, history });
+
+export const saveExam = (exam: {
+  id: string;
+  started_at: string;
+  practice_mode: boolean;
+  tasks: { task: number; item_id: string | null; history: Turn[]; score: number; corrections: Correction[] }[];
+}) => postJson<{ saved: boolean; exam?: { score: number; nclc: string } }>("/api/exam/save", exam);
 
 export const resetProgress = () => request<{ removed: number }>("/api/progress", { method: "DELETE" });
 

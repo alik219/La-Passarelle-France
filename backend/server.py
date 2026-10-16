@@ -3,11 +3,10 @@
 import os
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import uvicorn
 from dotenv import load_dotenv
-from urllib.parse import urlparse
-
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -17,8 +16,15 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from tutor import memory  # noqa: E402
-from tutor.llm import LLMError, session_note, translate, tutor_reply  # noqa: E402  (needs .env loaded first)
+from tutor import exam, memory  # noqa: E402
+from tutor.llm import (  # noqa: E402  (needs .env loaded first)
+    LLMError,
+    exam_evaluate,
+    exam_turn,
+    session_note,
+    translate,
+    tutor_reply,
+)
 from tutor.modes import MODES, ordered  # noqa: E402
 from tutor.modes.base import Address, Level  # noqa: E402
 from tutor.stt import transcribe  # noqa: E402
@@ -176,6 +182,107 @@ def progress():
 @app.delete("/api/progress")
 def reset_progress():
     return {"removed": memory.reset()}
+
+
+# ---------- TCF Canada timed exam ----------
+
+@app.get("/api/exam/plan")
+def exam_plan(tasks: str = "1,2,3"):
+    """A fresh exam: the chosen tasks (e.g. "1,2,3" or "2") with a random situation/statement."""
+    try:
+        numbers = sorted({int(t) for t in tasks.split(",") if t.strip()})
+    except ValueError as exc:
+        raise HTTPException(422, "tasks must be numbers like 1,2,3") from exc
+    if not numbers or any(n not in exam.TASKS for n in numbers):
+        raise HTTPException(422, "tasks must be 1, 2 and/or 3")
+    return {"tasks": exam.plan(numbers), "closing": exam.CLOSING, "closing_translation": exam.CLOSING_EN}
+
+
+class ExamTaskRequest(BaseModel):
+    task: int = Field(ge=1, le=3)
+    item_id: str | None = Field(default=None, max_length=16)
+    history: list[Turn] = Field(max_length=200)
+
+
+def _exam_item(req: ExamTaskRequest) -> dict | None:
+    item = exam.item_for(req.task, req.item_id)
+    if req.task in (2, 3) and not item:
+        raise HTTPException(422, "Unknown exam situation or statement.")
+    return item
+
+
+@app.post("/api/exam/turn")
+async def exam_next_turn(req: ExamTaskRequest):
+    """The examiner's next line. No corrections during the task, as in the real exam."""
+    try:
+        system = exam.examiner_prompt(req.task, _exam_item(req))
+        return await exam_turn(system, [t.model_dump() for t in req.history])
+    except LLMError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+
+
+@app.post("/api/exam/evaluate")
+async def exam_score(req: ExamTaskRequest):
+    """Score one finished task: /20, NCLC estimate, strengths, improvements, corrections."""
+    item = _exam_item(req)
+    history = [t.model_dump() for t in req.history]
+    if not any(t["role"] == "learner" and t["text"].strip() for t in history):
+        result = {"score": 0, "strengths": [], "corrections": [],
+                  "improvements": ["You didn't answer during this task. In the real exam, silence scores zero."]}
+    else:
+        try:
+            result = await exam_evaluate(exam.evaluation_prompt(req.task, item), history)
+        except LLMError as exc:
+            raise HTTPException(exc.status, str(exc)) from exc
+    return {**result, "nclc": exam.nclc(result["score"]), "task": req.task}
+
+
+class ExamTaskRecord(BaseModel):
+    task: int = Field(ge=1, le=3)
+    item_id: str | None = Field(default=None, max_length=16)
+    history: list[Turn] = Field(max_length=200)
+    score: int = Field(ge=0, le=20)
+    corrections: list[SavedCorrection] = Field(default=[], max_length=10)
+
+
+class ExamSaveRequest(BaseModel):
+    id: str
+    started_at: str = Field(max_length=40)
+    practice_mode: bool = False
+    tasks: list[ExamTaskRecord] = Field(min_length=1, max_length=3)
+
+
+@app.post("/api/exam/save")
+def exam_save(req: ExamSaveRequest):
+    """Save an exam (after each finished task, so nothing is lost) to your progress."""
+    if not memory.valid_id(req.id):
+        raise HTTPException(422, "Invalid session id.")
+    tasks = sorted(req.tasks, key=lambda t: t.task)
+    overall = round(sum(t.score for t in tasks) / len(tasks))
+    messages, corrections = [], []
+    for t in tasks:
+        messages += [m.model_dump() for m in t.history]
+        corrections += [c.model_dump() for c in t.corrections]
+    scores = ", ".join(f"Task {t.task}: {t.score}/20" for t in tasks)
+    session = {
+        "id": req.id,
+        "mode": "timed-exam",
+        "level": "exam",
+        "address": "vous",
+        "started_at": req.started_at,
+        "ended_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "messages": messages,
+        "extra_corrections": corrections,  # counted in weak points like conversation corrections
+        "exam": {
+            "practice_mode": req.practice_mode,
+            "tasks": [{"task": t.task, "item_id": t.item_id, "score": t.score, "nclc": exam.nclc(t.score)} for t in tasks],
+            "score": overall,
+            "nclc": exam.nclc(overall),
+        },
+        "note": f"TCF exam simulation ({len(tasks)} task{'s' if len(tasks) > 1 else ''}): "
+        f"{scores}. Estimated overall {overall}/20 ({exam.nclc(overall)}).",
+    }
+    return {"saved": True, **memory.save(session)}
 
 
 # In production, serve the built website from web/dist.

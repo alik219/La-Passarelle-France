@@ -9,7 +9,30 @@ corrections as you go.
 > corrections, an English translation of every reply (on click), a Hint button, your
 > level (A1–C1, which also sets how much Claire says) and tu/vous. Sessions are saved with
 > a short note from Claire, your weak points are tracked, and Claire quietly practises
-> them with you. More practice modes are coming next.
+> them with you. **New:** a timed TCF Canada speaking-test simulation (all 3 tasks or one),
+> with an estimated score /20 and NCLC level after each task. Feedback Report and
+> Vocabulary Drill are coming next.
+
+## Timed exam (TCF Canada speaking test)
+
+Pick **Timed Exam** on the home page. It follows the real expression orale test:
+
+| Task | What you do | Time |
+|---|---|---|
+| 1. Entretien dirigé (guided interview) | Answer Claire's questions about yourself | 2 min |
+| 2. Exercice en interaction (interactive exercise) | Read a situation, then ask Claire (playing the other person) questions | 2 min preparation + 3 min 30 |
+| 3. Expression d'un point de vue (giving an opinion) | Give and defend your opinion on a statement | 4 min 30 |
+
+- Choose the **full exam** (about 12 minutes) or a **single task**.
+- **Exam mode** gives real conditions: no translation and no hints. **Practice mode** turns on the EN and Hint buttons.
+- Timers are strict. You can end Task 2's preparation early, or finish a task early.
+- Claire is a neutral examiner and doesn't correct you during a task. When a task ends you get an
+  **estimated score /20, the NCLC level**, strengths, things to improve, and corrections.
+- Results are saved to your progress, and exam corrections count toward your weak points.
+- Situations and debate statements live in `backend/tutor/exam.py`. Add more there.
+- Scores are an AI estimate to guide your preparation, not an official TCF result.
+
+Developers: open `http://localhost:5173/practice/timed-exam?fast=1` (dev server only) to run every timer 12× faster for testing.
 
 ## What it costs: nothing
 
@@ -94,7 +117,7 @@ Icons are names from [lucide](https://lucide.dev/icons) (for example `message-ci
 2. ~~Claire speaks; you answer with your microphone~~
 3. ~~Animated Claire (lip-sync, blinking)~~
 4. ~~Saved sessions and a "weak points" memory~~
-5. Timed Exam, Feedback Report and Vocabulary Drill modes
+5. ~~Timed Exam (TCF Canada simulation)~~, then Feedback Report and Vocabulary Drill
 
 ## Credits
 

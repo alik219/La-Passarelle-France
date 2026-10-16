@@ -175,6 +175,68 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
     }
 
 
+# ---------- TCF exam simulation ----------
+
+EXAM_TURN_SCHEMA = {
+    "type": "object",
+    "properties": {"reply": {"type": "string"}, "hint": {"type": "string"}},
+    "required": ["reply", "hint"],
+    "additionalProperties": False,
+}
+
+EXAM_EVAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer"},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "improvements": {"type": "array", "items": {"type": "string"}},
+        "corrections": {"type": "array", "items": CORRECTION_SCHEMA},
+    },
+    "required": ["score", "strengths", "improvements", "corrections"],
+    "additionalProperties": False,
+}
+
+
+def _clean_correction(c: dict) -> dict | None:
+    if not isinstance(c, dict) or not (c.get("corrected") or "").strip():
+        return None
+    out = {k: (c.get(k) or "").strip() for k in ("original", "corrected", "explanation", "category")}
+    out["category"] = normalize_category(out["category"])
+    return out
+
+
+async def exam_turn(system: str, history: list[dict]) -> dict:
+    """The examiner's next line in a TCF task: {"reply", "hint"}. Never corrects."""
+    data = _parse_object(await _complete(system, _turns(history), EXAM_TURN_SCHEMA))
+    return {"reply": (data.get("reply") or "").strip(), "hint": (data.get("hint") or "").strip()}
+
+
+async def exam_evaluate(system: str, history: list[dict]) -> dict:
+    """Score one TCF task from its transcript: score /20, strengths, improvements, corrections."""
+    transcript = "\n".join(
+        f"{'EXAMINER' if t['role'] == 'tutor' else 'CANDIDATE'}: {t['text']}" for t in history if t.get("text")
+    )
+    data = _parse_object(await _complete(system, [("user", "Transcript:\n" + transcript)], EXAM_EVAL_SCHEMA))
+    try:
+        score = max(0, min(20, int(data.get("score", 0))))
+    except (TypeError, ValueError):
+        score = 0
+    lines = lambda key: [s.strip() for s in data.get(key) or [] if isinstance(s, str) and s.strip()][:3]  # noqa: E731
+    corrections = [c for c in (_clean_correction(x) for x in data.get("corrections") or []) if c][:5]
+    return {"score": score, "strengths": lines("strengths"), "improvements": lines("improvements"),
+            "corrections": corrections}
+
+
+def _parse_object(text: str) -> dict:
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise LLMError(f"Claire's answer wasn't valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise LLMError("Claire's answer had the wrong shape. Please try again.")
+    return data
+
+
 NOTE_PROMPT = """You are Madame Claire, a warm French tutor. Your student (level {level}) just
 finished a speaking practice session for the TCF Canada exam. From the corrections below,
 write a note IN ENGLISH of 2 or 3 short sentences: what they did well, the one or two things

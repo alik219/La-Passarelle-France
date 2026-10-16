@@ -88,7 +88,9 @@ export default function ProgressPanel() {
               <li key={s.id}>
                 <div className="session-list__meta">
                   <span className="session-list__date">{dateFormat.format(new Date(s.started_at))}</span>
-                  <span className="pill">{s.level}</span>
+                  <span className="pill">
+                    {s.exam ? `TCF exam · ${s.exam.score}/20 · ${s.exam.nclc}` : s.level}
+                  </span>
                 </div>
                 <div className="session-list__stats">
                   <span>
