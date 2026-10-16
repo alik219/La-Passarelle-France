@@ -6,8 +6,11 @@ from pathlib import Path
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from urllib.parse import urlparse
+
+from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -24,6 +27,20 @@ from tutor.tts import synthesize  # noqa: E402
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # ~10 minutes of compressed speech; plenty for one answer
 
 app = FastAPI(title="Passerelle France")
+
+# Only this computer's own pages may use the API. Without this, any website open in your
+# browser could send requests to localhost (using up your free quota or wiping progress),
+# and a "DNS rebinding" site could even read the replies.
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]"])
+
+
+@app.middleware("http")
+async def same_site_only(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin and urlparse(origin).hostname not in {h.strip("[]") for h in LOCAL_HOSTS}:
+        return JSONResponse({"detail": "Requests from other websites aren't allowed."}, status_code=403)
+    return await call_next(request)
 
 
 class Turn(BaseModel):
