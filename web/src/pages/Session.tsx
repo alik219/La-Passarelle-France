@@ -5,7 +5,9 @@ import { chat, getModes, type Mode } from "../api";
 import { Logo } from "../components/Brand";
 import { ChatMessage, Composer, Typing, type Message } from "../components/Chat";
 import Claire from "../components/Claire";
+import LevelPicker from "../components/LevelPicker";
 import ThemeToggle from "../components/ThemeToggle";
+import { useAddress, useLevel } from "../settings";
 
 type Status = "listening" | "thinking";
 
@@ -26,6 +28,8 @@ export default function Session() {
   const [startedAt] = useState(() => new Date());
   const elapsed = useElapsed(startedAt);
   const endRef = useRef<HTMLDivElement>(null);
+  const [level, setLevel] = useLevel();
+  const [address, setAddress] = useAddress();
 
   useEffect(() => {
     getModes().then(
@@ -33,11 +37,29 @@ export default function Session() {
         const found = modes.find((m) => m.id === modeId && m.enabled);
         if (!found) return navigate("/", { replace: true });
         setMode(found);
-        setMessages([{ role: "tutor", text: found.opening_line }]);
       },
       (e: Error) => setError(e.message),
     );
   }, [modeId, navigate]);
+
+  // Claire's greeting; switching tu/vous before you've answered re-greets you in that form.
+  useEffect(() => {
+    if (!mode) return;
+    setMessages((m) =>
+      m.length > 1
+        ? m
+        : [
+            {
+              role: "tutor",
+              text: mode.opening[address],
+              translation: mode.opening_translation,
+              hint: mode.opening_hint,
+            },
+          ],
+    );
+  }, [mode, address]);
+
+  const lastTutor = [...messages].reverse().find((m) => m.role === "tutor");
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -53,8 +75,15 @@ export default function Session() {
       const res = await chat(
         mode.id,
         next.map(({ role, text }) => ({ role, text })),
+        level,
+        address,
       );
-      setMessages((m) => [...m, { role: "tutor", text: res.reply, correction: res.correction }]);
+      const learnerIndex = next.length - 1;
+      setMessages((m) => [
+        // The correction belongs to the message it corrects.
+        ...m.map((msg, i) => (i === learnerIndex ? { ...msg, correction: res.correction } : msg)),
+        { role: "tutor", text: res.reply, translation: res.translation, hint: res.hint },
+      ]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -72,6 +101,20 @@ export default function Session() {
           <span className="session-bar__time">{elapsed}</span>
         </div>
         <div className="session-bar__actions">
+          <LevelPicker value={level} onChange={setLevel} />
+          <div className="segmented" role="group" aria-label="How Claire addresses you">
+            {(["vous", "tu"] as const).map((a) => (
+              <button
+                key={a}
+                type="button"
+                aria-pressed={address === a}
+                onClick={() => setAddress(a)}
+                title={a === "vous" ? "Formal, as in the exam" : "Casual"}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
           <ThemeToggle />
           <button type="button" className="btn btn--end" onClick={() => navigate("/")}>
             End session <X size={15} />
@@ -137,6 +180,7 @@ export default function Session() {
           )}
           <Composer
             disabled={!mode || status === "thinking"}
+            hint={status === "thinking" ? undefined : lastTutor?.hint}
             onSend={send}
             onMic={() => setNotice("Speaking to Claire with your microphone is coming in the next update. Type your answer for now.")}
           />

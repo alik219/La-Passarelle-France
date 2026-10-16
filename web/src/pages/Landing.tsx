@@ -4,8 +4,10 @@ import { Link } from "react-router-dom";
 import { getModes, type Mode } from "../api";
 import { Logo, TricoloreStripe } from "../components/Brand";
 import Claire from "../components/Claire";
+import LevelPicker from "../components/LevelPicker";
 import ModeCard from "../components/ModeCard";
 import ThemeToggle from "../components/ThemeToggle";
+import { useLevel } from "../settings";
 
 const FIRST_MODE = "/practice/free-conversation";
 
@@ -18,6 +20,7 @@ const POINTS = [
 export default function Landing() {
   const [modes, setModes] = useState<Mode[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [level, setLevel] = useLevel();
 
   useEffect(() => {
     getModes().then(setModes, (e: Error) => setError(e.message));
@@ -31,7 +34,7 @@ export default function Landing() {
         <nav className="site-nav">
           <a href="#modes">Practice</a>
           <a href="#about">About</a>
-          <span className="pill">Level B1–B2</span>
+          <LevelPicker value={level} onChange={setLevel} />
           <ThemeToggle />
         </nav>
       </header>

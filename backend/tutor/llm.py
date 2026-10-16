@@ -13,8 +13,11 @@ REPLY_SCHEMA = {
     "properties": {
         "reply": {"type": "STRING"},
         "correction": {"type": "STRING", "nullable": True},
+        "translation": {"type": "STRING"},
+        "hint": {"type": "STRING"},
     },
-    "required": ["reply", "correction"],
+    "required": ["reply", "correction", "translation", "hint"],
+    "propertyOrdering": ["reply", "correction", "translation", "hint"],
 }
 
 
@@ -49,7 +52,10 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": _to_contents(history),
         "generationConfig": {
-            "temperature": 0.8,
+            "temperature": 0.6,
+            # Safety net only. The prompt keeps replies to 1-2 sentences; a tighter cap
+            # would cut the JSON (reply + correction + translation + hint) mid-way.
+            "maxOutputTokens": 400,
             "responseMimeType": "application/json",
             "responseSchema": REPLY_SCHEMA,
             # Skip "thinking" so replies come back fast enough for conversation.
@@ -61,7 +67,11 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
             API_URL.format(model=model), json=body, headers={"x-goog-api-key": key}
         )
     if resp.status_code == 429:
-        raise LLMError("Gemini's free daily limit was reached. Try again later.", status=429)
+        raise LLMError(
+            "Gemini's free-tier limit was reached (too many messages this minute, or today's "
+            "quota). Wait a minute and try again.",
+            status=429,
+        )
     if resp.status_code >= 400:
         detail = resp.json().get("error", {}).get("message", resp.text) if resp.content else ""
         raise LLMError(f"Gemini error {resp.status_code}: {detail}")
@@ -73,4 +83,9 @@ async def tutor_reply(system: str, history: list[dict]) -> dict:
         raise LLMError(f"Unexpected Gemini response: {exc}") from exc
 
     correction = (data.get("correction") or "").strip() or None
-    return {"reply": data.get("reply", "").strip(), "correction": correction}
+    return {
+        "reply": data.get("reply", "").strip(),
+        "correction": correction,
+        "translation": (data.get("translation") or "").strip(),
+        "hint": (data.get("hint") or "").strip(),
+    }

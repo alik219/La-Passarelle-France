@@ -6,7 +6,6 @@ MODE = Mode(
     description="Track your progress and identify the areas you should focus on next.",
     icon="target",
     heading="Your progress",
-    opening_line="Voyons ensemble vos progrès.",
     instructions="Mode: feedback report (not built yet).",
     enabled=False,
     order=30,

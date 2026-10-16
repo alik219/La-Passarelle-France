@@ -15,6 +15,7 @@ load_dotenv(ROOT / ".env")
 
 from tutor.llm import LLMError, tutor_reply  # noqa: E402  (needs .env loaded first)
 from tutor.modes import MODES, ordered  # noqa: E402
+from tutor.modes.base import Address, Level  # noqa: E402
 
 app = FastAPI(title="Passerelle France")
 
@@ -27,6 +28,8 @@ class Turn(BaseModel):
 class ChatRequest(BaseModel):
     mode: str
     history: list[Turn] = Field(max_length=200)
+    level: Level = "A2"
+    address: Address = "vous"
 
 
 @app.get("/api/modes")
@@ -40,7 +43,8 @@ async def chat(req: ChatRequest):
     if not mode or not mode.enabled:
         raise HTTPException(404, f"Unknown or unavailable mode: {req.mode}")
     try:
-        return await tutor_reply(mode.system_prompt(), [t.model_dump() for t in req.history])
+        system = mode.system_prompt(level=req.level, address=req.address)
+        return await tutor_reply(system, [t.model_dump() for t in req.history])
     except LLMError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 

@@ -4,7 +4,8 @@ A free, open-source speaking tutor for the **TCF Canada** oral exam. You talk wi
 **Madame Claire**, an AI tutor who answers in natural French and gives you brief
 corrections as you go.
 
-> Status: milestone 1 of 5. Text conversation with live corrections works.
+> Status: milestone 1 of 5. Text conversation works, with live corrections, an English
+> translation of every reply, a Hint button, your level (A1–C1) and tu/vous.
 > Voice, the animated tutor and progress memory are coming in later milestones.
 
 ## What it costs: nothing
@@ -58,8 +59,10 @@ Every practice mode is a single Python file in `backend/tutor/modes/`. The websi
 builds its mode cards from whatever is in that folder.
 
 1. Copy `backend/tutor/modes/free_conversation.py` to a new file, e.g. `role_play.py`.
-2. Change `id`, `title`, `description`, `icon`, `heading`, `opening_line` and the
-   instructions in `system_prompt`.
+2. Change `id`, `title`, `description`, `icon`, `heading`, the opening lines
+   (`opening_vous`, `opening_tu`, `opening_translation`, `opening_hint`) and `instructions`.
+   Shared rules (level, tu/vous, one question per turn, corrections, hints) live in
+   `backend/tutor/modes/base.py` and apply to every mode.
 3. Set `enabled=True`. Restart the backend, and the new card appears.
 
 Icons are names from [lucide](https://lucide.dev/icons) (for example `message-circle`, `timer`).

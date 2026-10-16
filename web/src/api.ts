@@ -1,16 +1,25 @@
+import type { Address, Level } from "./settings";
+
 export type Mode = {
   id: string;
   title: string;
   description: string;
   icon: string;
   heading: string;
-  opening_line: string;
+  opening: Record<Address, string>;
+  opening_translation: string;
+  opening_hint: string;
   enabled: boolean;
 };
 
 export type Turn = { role: "tutor" | "learner"; text: string };
 
-export type TutorReply = { reply: string; correction: string | null };
+export type TutorReply = {
+  reply: string;
+  correction: string | null;
+  translation: string;
+  hint: string;
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
@@ -34,9 +43,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getModes = () => request<Mode[]>("/api/modes");
 
-export const chat = (mode: string, history: Turn[]) =>
+export const chat = (mode: string, history: Turn[], level: Level, address: Address) =>
   request<TutorReply>("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode, history }),
+    body: JSON.stringify({ mode, history, level, address }),
   });

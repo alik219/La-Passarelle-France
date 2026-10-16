@@ -135,6 +135,52 @@ p {
   padding: 6px 12px;
   border-radius: 999px;
 }
+/* level dropdown dressed as the header pill */
+.pill--select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.pill--select:hover {
+  border-color: var(--faint);
+}
+.pill--select select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.pill--select:focus-within {
+  outline: 2px solid var(--rouge);
+  outline-offset: 2px;
+}
+
+/* vous | tu switch */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+}
+.segmented button {
+  padding: 4px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--btn-primary);
+  color: var(--btn-primary-ink);
+}
+
 .icon-btn {
   display: inline-grid;
   place-items: center;
@@ -764,10 +810,81 @@ p {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
-.bubble__audio {
+.bubble__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: none;
-  margin-top: 4px;
+}
+.bubble__audio {
   color: var(--heading);
+}
+
+/* English translation popup on Claire's messages */
+.translate {
+  position: relative;
+}
+.translate__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--heading);
+  background: var(--chip);
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.translate__btn:hover,
+.translate__btn.is-open {
+  border-color: var(--faint);
+}
+.translate__pop {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: -6px;
+  width: min(340px, 80vw);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--bleu);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  animation: pop-in 0.12s ease-out;
+}
+:root[data-theme="dark"] .translate__pop {
+  border-top-color: #8fb4e8;
+}
+.translate__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.translate__head button {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 .bubble--learner {
   background: var(--bubble-learner);
@@ -824,6 +941,47 @@ p {
 
 .composer {
   padding-top: 10px;
+}
+.hint-row {
+  display: flex;
+  margin-bottom: 8px;
+}
+.hint-btn,
+.hint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 999px;
+  border: 1px dashed var(--faint);
+  background: var(--card);
+  color: var(--heading);
+}
+.hint-btn {
+  font-weight: 600;
+}
+.hint-btn:hover,
+.hint-chip:hover {
+  border-style: solid;
+}
+.hint-chip {
+  max-width: 100%;
+  text-align: left;
+  animation: pop-in 0.12s ease-out;
+}
+.hint-chip__label {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hint-chip__text {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-style: italic;
 }
 .composer__box {
   display: flex;
@@ -953,8 +1111,16 @@ p {
     grid-template-columns: auto 1fr;
     padding: 10px 12px;
   }
-  .session-bar .logo {
+  .session-bar .logo,
+  .session-bar__time,
+  .session-bar__sep {
     display: none;
+  }
+  .session-bar__actions {
+    gap: 6px;
+  }
+  .btn--end {
+    padding: 6px 10px;
   }
   .session__body {
     grid-template-columns: 1fr;

@@ -1,11 +1,60 @@
-import { Lightbulb, Mic, Send, Volume2 } from "lucide-react";
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { CornerDownLeft, HelpCircle, Languages, Lightbulb, Mic, Send, Volume2, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 export type Message = {
   role: "tutor" | "learner";
   text: string;
-  correction?: string | null;
+  correction?: string | null; // on learner messages: Claire's tip about that message
+  translation?: string; // on tutor messages
+  hint?: string; // on tutor messages: a starter for answering
 };
+
+/** "EN" button on Claire's bubble that pops up the English version of what she said. */
+function TranslatePopup({ translation }: { translation: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="translate" ref={ref}>
+      <button
+        type="button"
+        className={`translate__btn${open ? " is-open" : ""}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={id}
+        title="Show in English"
+      >
+        <Languages size={14} /> EN
+      </button>
+      {open && (
+        <div className="translate__pop" id={id} role="dialog" aria-label="English translation">
+          <div className="translate__head">
+            <span>In English</span>
+            <button type="button" onClick={() => setOpen(false)} aria-label="Close translation">
+              <X size={14} />
+            </button>
+          </div>
+          <p>{translation}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ChatMessage({ message }: { message: Message }) {
   if (message.role === "learner") {
@@ -15,6 +64,14 @@ export function ChatMessage({ message }: { message: Message }) {
           Vous <span className="avatar avatar--learner">V</span>
         </div>
         <div className="bubble bubble--learner">{message.text}</div>
+        {message.correction && (
+          <div className="correction">
+            <p className="correction__label">
+              <Lightbulb size={13} /> Quick correction
+            </p>
+            <p>{message.correction}</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -25,16 +82,11 @@ export function ChatMessage({ message }: { message: Message }) {
       </div>
       <div className="bubble bubble--tutor">
         <span>{message.text}</span>
-        <Volume2 size={15} className="bubble__audio" aria-hidden="true" />
-      </div>
-      {message.correction && (
-        <div className="correction">
-          <p className="correction__label">
-            <Lightbulb size={13} /> Quick correction
-          </p>
-          <p>{message.correction}</p>
+        <div className="bubble__tools">
+          {message.translation && <TranslatePopup translation={message.translation} />}
+          <Volume2 size={15} className="bubble__audio" aria-hidden="true" />
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -56,12 +108,30 @@ export function Typing() {
 
 type ComposerProps = {
   disabled: boolean;
+  hint?: string; // sentence starter for answering Claire's latest question
   onSend: (text: string) => void;
   onMic: () => void;
 };
 
-export function Composer({ disabled, onSend, onMic }: ComposerProps) {
+export function Composer({ disabled, hint, onSend, onMic }: ComposerProps) {
   const [text, setText] = useState("");
+  const [showHint, setShowHint] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Each new question from Claire starts with the hint hidden again.
+  useEffect(() => setShowHint(false), [hint]);
+
+  function applyStarter() {
+    if (!hint) return;
+    const starter = hint.replace(/\s*(…|\.\.\.)\s*$/, "") + " ";
+    setText(starter);
+    setShowHint(false);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      el?.focus();
+      el?.setSelectionRange(starter.length, starter.length);
+    });
+  }
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
@@ -80,6 +150,21 @@ export function Composer({ disabled, onSend, onMic }: ComposerProps) {
 
   return (
     <form className="composer" onSubmit={submit}>
+      {hint && (
+        <div className="hint-row">
+          {showHint ? (
+            <button type="button" className="hint-chip" onClick={applyStarter} title="Use this to start your answer">
+              <span className="hint-chip__label">Try starting with</span>
+              <span className="hint-chip__text">{hint}</span>
+              <CornerDownLeft size={14} aria-hidden="true" />
+            </button>
+          ) : (
+            <button type="button" className="hint-btn" onClick={() => setShowHint(true)}>
+              <HelpCircle size={14} /> Hint
+            </button>
+          )}
+        </div>
+      )}
       <div className="composer__box">
         <button type="button" className="composer__mic" onClick={onMic} aria-label="Answer with your microphone">
           <Mic size={18} />
@@ -87,6 +172,7 @@ export function Composer({ disabled, onSend, onMic }: ComposerProps) {
         <label className="composer__field">
           <span className="composer__label">Type or use the microphone…</span>
           <textarea
+            ref={inputRef}
             rows={1}
             value={text}
             placeholder="Your answer in French"
