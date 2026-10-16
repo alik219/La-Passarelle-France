@@ -24,7 +24,6 @@ export type Correction = {
 export type TutorReply = {
   reply: string;
   correction: Correction | null;
-  translation: string;
   hint: string;
 };
 
@@ -50,7 +49,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getModes = () => request<Mode[]>("/api/modes");
 
-export const chat = (mode: string, history: Turn[], level: Level, address: Address) =>
+export const translate = (text: string) =>
+  request<{ translation: string }>("/api/translate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  }).then((r) => r.translation);
+
+export const chat =(mode: string, history: Turn[], level: Level, address: Address) =>
   request<TutorReply>("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

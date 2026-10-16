@@ -861,6 +861,14 @@ p {
 :root[data-theme="dark"] .translate__pop {
   border-top-color: #8fb4e8;
 }
+.translate__loading {
+  color: var(--muted);
+  font-style: italic;
+}
+.translate__error {
+  color: var(--rouge);
+  font-size: 13px;
+}
 .translate__head {
   display: flex;
   align-items: center;

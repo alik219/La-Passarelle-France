@@ -82,7 +82,7 @@ export default function Session() {
       setMessages((m) => [
         // The correction belongs to the message it corrects.
         ...m.map((msg, i) => (i === learnerIndex ? { ...msg, correction: res.correction } : msg)),
-        { role: "tutor", text: res.reply, translation: res.translation, hint: res.hint },
+        { role: "tutor", text: res.reply, hint: res.hint },
       ]);
     } catch (e) {
       setError((e as Error).message);

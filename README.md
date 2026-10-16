@@ -12,14 +12,17 @@ corrections as you go.
 
 | Part | What we use | Cost |
 |---|---|---|
-| Tutor brain | Google Gemini (free tier, your own key) | $0 |
+| Tutor brain | [Ollama](https://ollama.com) running `gemma3:4b` on your own computer (or optionally Google Gemini's free tier) | $0 |
 | Claire's voice *(milestone 2)* | [edge-tts](https://github.com/rany2/edge-tts) (Microsoft Edge neural voices) | $0 |
 | Hearing you *(milestone 2)* | Your browser's Web Speech API (Chrome or Edge) | $0 |
 | Animated tutor *(milestone 3)* | Hand-drawn SVG, animated in the browser | $0 |
 | Hosting | Runs on your own computer | $0 |
 
 Notes:
-- Gemini's free tier has daily limits, and Google may use free-tier conversations to improve its models.
+- With Ollama everything runs locally: no account, no key, no daily limit. On a laptop
+  without a graphics card, Claire takes roughly 5–15 seconds per reply.
+- Gemini is faster, but its free tier is small (about 20 replies a day on `gemini-2.5-flash`),
+  and Google may use free-tier conversations to improve its models.
 - edge-tts uses Microsoft Edge's public read-aloud service. It's free but unofficial, so it could change.
 - Your practice history is saved only on your own computer (`sessions/`, which git ignores).
 
@@ -27,8 +30,13 @@ Notes:
 
 You need Python 3.10+ and Node.js 18+.
 
-1. Get a free Gemini API key at https://aistudio.google.com/apikey
-2. Copy `.env.example` to `.env` and paste your key after `GEMINI_API_KEY=`
+1. Install [Ollama](https://ollama.com/download), then download Claire's model (about 3.3 GB):
+   ```
+   ollama pull gemma3:4b
+   ```
+2. Copy `.env.example` to `.env`. The defaults use Ollama. To use Gemini instead, set
+   `LLM_PROVIDER=gemini` and paste a free key from https://aistudio.google.com/apikey
+   after `GEMINI_API_KEY=`.
 3. Start the backend (one terminal, from the project folder):
    ```
    cd backend && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt && python server.py
@@ -44,8 +52,8 @@ You need Python 3.10+ and Node.js 18+.
 
 ```
 backend/             Python + FastAPI
-  server.py          API routes (/api/modes, /api/chat)
-  tutor/llm.py       Gemini call (the one place to swap AI providers)
+  server.py          API routes (/api/modes, /api/chat, /api/translate)
+  tutor/llm.py       Ollama and Gemini calls (the one place to swap AI providers)
   tutor/modes/       one file per practice mode
 web/                 React + Vite + TypeScript
   src/pages/         Landing and Session pages

@@ -1,6 +1,6 @@
 import { CornerDownLeft, HelpCircle, Languages, Lightbulb, Mic, Send, Volume2, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { Correction } from "../api";
+import { translate, type Correction } from "../api";
 
 const CATEGORY_LABEL: Record<string, string> = {
   tense: "Verb tense",
@@ -46,15 +46,33 @@ export type Message = {
   role: "tutor" | "learner";
   text: string;
   correction?: Correction | null; // on learner messages: Claire's fix for that message
-  translation?: string; // on tutor messages
+  translation?: string; // on tutor messages, when known up front (otherwise fetched on click)
   hint?: string; // on tutor messages: a starter for answering
 };
 
-/** "EN" button on Claire's bubble that pops up the English version of what she said. */
-function TranslatePopup({ translation }: { translation: string }) {
+/**
+ * "EN" button on Claire's bubble that pops up the English version of what she said.
+ * The translation is fetched the first time it's opened (unless one was given up front).
+ */
+function TranslatePopup({ text, initial }: { text: string; initial?: string }) {
   const [open, setOpen] = useState(false);
+  const [translation, setTranslation] = useState(initial ?? "");
+  const [failed, setFailed] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
+
+  useEffect(() => {
+    if (!open || translation) return;
+    let cancelled = false;
+    setFailed(null);
+    translate(text).then(
+      (t) => !cancelled && setTranslation(t),
+      (e: Error) => !cancelled && setFailed(e.message),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [open, text, translation]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +108,13 @@ function TranslatePopup({ translation }: { translation: string }) {
               <X size={14} />
             </button>
           </div>
-          <p>{translation}</p>
+          {translation ? (
+            <p>{translation}</p>
+          ) : failed ? (
+            <p className="translate__error">{failed}</p>
+          ) : (
+            <p className="translate__loading">Translating…</p>
+          )}
         </div>
       )}
     </div>
@@ -117,7 +141,7 @@ export function ChatMessage({ message }: { message: Message }) {
       <div className="bubble bubble--tutor">
         <span>{message.text}</span>
         <div className="bubble__tools">
-          {message.translation && <TranslatePopup translation={message.translation} />}
+          <TranslatePopup text={message.text} initial={message.translation} />
           <Volume2 size={15} className="bubble__audio" aria-hidden="true" />
         </div>
       </div>

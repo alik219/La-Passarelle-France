@@ -62,7 +62,6 @@ CORRECTION_RULES = """Corrections: check the student's latest message word by wo
 - If there is no real mistake, set "correction" to null. Do not invent corrections."""
 
 OUTPUT_RULES = """Other fields:
-- "translation": a natural English translation of your "reply" (not of the correction).
 - "hint": a short French sentence starter the student could use to answer your question,
   ending with "…" (for example « Je l'apprends parce que… »). Match the student's level and
   the tu/vous form."""

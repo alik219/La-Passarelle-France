@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from tutor.llm import LLMError, tutor_reply  # noqa: E402  (needs .env loaded first)
+from tutor.llm import LLMError, translate, tutor_reply  # noqa: E402  (needs .env loaded first)
 from tutor.modes import MODES, ordered  # noqa: E402
 from tutor.modes.base import Address, Level  # noqa: E402
 
@@ -45,6 +45,18 @@ async def chat(req: ChatRequest):
     try:
         system = mode.system_prompt(level=req.level, address=req.address)
         return await tutor_reply(system, [t.model_dump() for t in req.history])
+    except LLMError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
+
+
+class TranslateRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@app.post("/api/translate")
+async def translate_text(req: TranslateRequest):
+    try:
+        return {"translation": await translate(req.text)}
     except LLMError as exc:
         raise HTTPException(exc.status, str(exc)) from exc
 
