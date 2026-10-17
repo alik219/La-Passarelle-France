@@ -1,5 +1,6 @@
-import { Clock, MessageSquare, RotateCcw, Target } from "lucide-react";
+import { ArrowRight, BookOpen, Clock, MessageSquare, RotateCcw, Target } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { getProgress, resetProgress, type Progress } from "../api";
 import { formatDuration } from "./SessionSummary";
 
@@ -21,7 +22,7 @@ export default function ProgressPanel() {
     setResetting(true);
     try {
       await resetProgress();
-      setProgress({ weak_points: [], sessions: [] });
+      setProgress({ weak_points: [], sessions: [], vocab: { learned: 0, due: 0, seen: 0 } });
     } finally {
       setResetting(false);
       setConfirming(false);
@@ -39,7 +40,7 @@ export default function ProgressPanel() {
         </div>
         {confirming ? (
           <div className="progress__confirm" role="group" aria-label="Confirm reset">
-            <span>Delete all saved sessions?</span>
+            <span>Delete all saved sessions and word reviews?</span>
             <button type="button" className="btn btn--end" onClick={reset} disabled={resetting}>
               {resetting ? "Deleting…" : "Yes, reset"}
             </button>
@@ -53,6 +54,21 @@ export default function ProgressPanel() {
           </button>
         )}
       </div>
+
+      {progress.vocab.seen > 0 && (
+        <div className="progress__vocab">
+          <BookOpen size={16} aria-hidden="true" />
+          <span>
+            <strong>{progress.vocab.learned}</strong> {progress.vocab.learned === 1 ? "word" : "words"} learned
+          </span>
+          <span className="muted">
+            {progress.vocab.due > 0 ? `${progress.vocab.due} due for review today` : "Nothing due for review today"}
+          </span>
+          <Link to="/practice/vocabulary-drill" className="btn btn--link">
+            {progress.vocab.due > 0 ? "Review now" : "Learn new words"} <ArrowRight size={14} />
+          </Link>
+        </div>
+      )}
 
       <div className="progress__grid">
         <div className="progress__box">
@@ -78,7 +94,9 @@ export default function ProgressPanel() {
               ))}
             </ol>
           )}
-          <p className="progress__foot">Based on your last 5 sessions. Claire quietly practises these with you.</p>
+          <p className="progress__foot">
+            Based on your last 5 conversations and exams. Claire quietly practises these with you.
+          </p>
         </div>
 
         <div className="progress__box">
@@ -89,19 +107,31 @@ export default function ProgressPanel() {
                 <div className="session-list__meta">
                   <span className="session-list__date">{dateFormat.format(new Date(s.started_at))}</span>
                   <span className="pill">
-                    {s.exam ? `TCF exam · ${s.exam.score}/20 · ${s.exam.nclc}` : s.level}
+                    {s.exam
+                      ? `TCF exam · ${s.exam.score}/20 · ${s.exam.nclc}`
+                      : s.drill
+                        ? `Vocabulary · ${s.drill.correct}/${s.drill.total}`
+                        : s.level}
                   </span>
                 </div>
                 <div className="session-list__stats">
                   <span>
                     <Clock size={13} /> {formatDuration(s.duration_seconds)}
                   </span>
-                  <span>
-                    <MessageSquare size={13} /> {s.messages_sent} {s.messages_sent === 1 ? "message" : "messages"}
-                  </span>
-                  <span>
-                    {s.corrections} {s.corrections === 1 ? "correction" : "corrections"}
-                  </span>
+                  {s.drill ? (
+                    <span>
+                      <BookOpen size={13} /> {s.drill.topic_title} · {s.drill.total} words · {s.level}
+                    </span>
+                  ) : (
+                    <>
+                      <span>
+                        <MessageSquare size={13} /> {s.messages_sent} {s.messages_sent === 1 ? "message" : "messages"}
+                      </span>
+                      <span>
+                        {s.corrections} {s.corrections === 1 ? "correction" : "corrections"}
+                      </span>
+                    </>
+                  )}
                 </div>
                 {s.note && <p className="session-list__note">{s.note}</p>}
               </li>

@@ -266,6 +266,53 @@ async def translate(text: str) -> str:
     return out.strip().strip('"')
 
 
+# ---------- Vocabulary Drill: fresh sentences ----------
+
+VOCAB_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "sentence": {"type": "string"},
+                    "answer": {"type": "string"},
+                    "translation": {"type": "string"},
+                },
+                "required": ["id", "sentence", "answer", "translation"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["items"],
+    "additionalProperties": False,
+}
+
+VOCAB_PROMPT = """You are Madame Claire, a French tutor from France. Your student (level {level}) is
+preparing for the TCF Canada and is doing a fill-in-the-blank vocabulary drill.
+For EACH word you are given, write ONE new sentence in correct, natural standard French:
+- 6 to 16 words, about everyday life in Canada, simple enough for level {level};
+- it contains the word exactly once (you may conjugate or agree it), and the context makes
+  its meaning clear, so a learner who knows the word could fill the gap;
+- it is different from the example given.
+"id": the word's id, copied exactly. "answer": the word exactly as it appears in your
+sentence (with no article). "translation": the sentence in English."""
+
+
+async def vocab_sentences(level: str, words: list[dict]) -> list[dict]:
+    """Fresh fill-in sentences for a drill: [{"id", "sentence", "answer", "translation"}].
+    The caller checks each one and keeps the built-in example when one doesn't fit."""
+    listing = "\n".join(
+        f"- id: {w['id']} | word: {w['fr']} ({w['en']}) | example: {w['example'].replace('{', '').replace('}', '')}"
+        for w in words
+    )
+    data = _parse_object(await _complete(VOCAB_PROMPT.format(level=level), [("user", listing)], VOCAB_SCHEMA))
+    items = data.get("items")
+    return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else []
+
+
 # ---------- Groq (cloud, OpenAI-compatible) ----------
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"

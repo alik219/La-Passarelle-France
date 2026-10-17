@@ -93,11 +93,15 @@ export type SessionStats = {
   by_category: CategoryCount[];
   note: string | null;
   exam: { score: number; nclc: string; practice_mode: boolean } | null;
+  drill: { topic: string; topic_title: string; total: number; correct: number } | null;
 };
 
 export type WeakPoint = CategoryCount & { example: { original: string; corrected: string } };
 
-export type Progress = { weak_points: WeakPoint[]; sessions: SessionStats[] };
+/** Words right at their latest review, and words due for review today. */
+export type VocabSummary = { learned: number; due: number; seen: number };
+
+export type Progress = { weak_points: WeakPoint[]; sessions: SessionStats[]; vocab: VocabSummary };
 
 export type SessionToSave = {
   id: string;
@@ -135,6 +139,8 @@ export type Report = {
     sessions: number;
     conversations: number;
     exams: number;
+    drills: number;
+    words_learned: number; // different words right at their latest drill in this period
     messages: number;
     corrections: number;
     active_days: number;
@@ -207,6 +213,57 @@ export const saveExam = (exam: {
   practice_mode: boolean;
   tasks: { task: number; item_id: string | null; history: Turn[]; score: number; corrections: Correction[] }[];
 }) => postJson<{ saved: boolean; exam?: { score: number; nclc: string } }>("/api/exam/save", exam);
+
+// ---------- Vocabulary Drill ----------
+
+export type VocabTopic = {
+  id: string;
+  title: string;
+  title_fr: string;
+  icon: string;
+  blurb?: string;
+  words: number;
+  due: number; // words due for review today
+  new: number; // words you haven't seen yet (at your level or one above)
+};
+
+export type VocabWord = {
+  id: string;
+  topic: string;
+  level: string;
+  fr: string; // with the article for nouns: "le loyer"
+  en: string;
+  article: string; // "le", "la", "les", "l'" or ""
+  gender: "m" | "f" | null;
+  accept: string[]; // other answers that count as right in "say it in French"
+  example: string; // the word as it appears in the sentence is in {curly braces}
+  example_en: string;
+  blank: string;
+  new: boolean;
+  stage: number; // -1 = new, then 0..4 = how far along the review intervals it is
+  last_correct: boolean | null;
+};
+
+export const getVocabTopics = (level: Level) => request<VocabTopic[]>(`/api/vocab/topics?level=${level}`);
+
+export const getVocabDrill = (topic: string, count: number, level: Level) =>
+  request<{ topic: VocabTopic; words: VocabWord[] }>(
+    `/api/vocab/drill?topic=${encodeURIComponent(topic)}&count=${count}&level=${level}`,
+  );
+
+/** Claire's fresh fill-in sentences, by word id. Empty if the AI is unavailable. */
+export const getVocabExtras = (level: Level, ids: string[]) =>
+  postJson<{ sentences: Record<string, { example: string; example_en: string }> }>("/api/vocab/extras", { level, ids });
+
+export type VocabSchedule = Record<string, { due: string; days: number }>;
+
+export const finishVocabDrill = (drill: {
+  id: string;
+  started_at: string;
+  topic: string;
+  level: Level;
+  results: { id: string; correct: boolean; almost: boolean }[];
+}) => postJson<{ saved: boolean; schedule: VocabSchedule } & SessionStats>("/api/vocab/finish", drill);
 
 export const resetProgress = () => request<{ removed: number }>("/api/progress", { method: "DELETE" });
 

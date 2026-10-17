@@ -111,7 +111,7 @@ export default function Report() {
             {data.stats.sessions === 0 ? (
               <div className="report-card report-empty">
                 <h2 className="report-card__title">No practice in this period yet</h2>
-                <p className="muted">Have a conversation with Claire or take a timed exam, and your report will fill in here.</p>
+                <p className="muted">Have a conversation with Claire, take a timed exam or a vocabulary drill, and your report will fill in here.</p>
                 <Link to="/" className="btn btn--primary">
                   Start practising <ArrowRight size={16} />
                 </Link>
@@ -140,9 +140,18 @@ function Stats({ data }: { data: ReportData }) {
   const s = data.stats;
   const tiles = [
     { label: "Time practised", value: formatDuration(s.seconds), sub: `${s.active_days} active day${s.active_days === 1 ? "" : "s"}` },
-    { label: "Sessions", value: String(s.sessions), sub: `${s.conversations} conversation${s.conversations === 1 ? "" : "s"} · ${s.exams} exam${s.exams === 1 ? "" : "s"}` },
+    {
+      label: "Sessions",
+      value: String(s.sessions),
+      sub: [
+        `${s.conversations} conversation${s.conversations === 1 ? "" : "s"}`,
+        `${s.exams} exam${s.exams === 1 ? "" : "s"}`,
+        `${s.drills} drill${s.drills === 1 ? "" : "s"}`,
+      ].join(" · "),
+    },
     { label: "Messages sent", value: String(s.messages), sub: "in French" },
     { label: "Corrections", value: String(s.corrections), sub: s.messages ? `${((s.corrections / s.messages) * 10).toFixed(1)} per 10 messages` : "" },
+    { label: "Words learned", value: String(s.words_learned), sub: s.drills ? "right at their latest drill" : "take a vocabulary drill" },
     { label: "Day streak", value: String(s.streak), sub: s.streak ? "days in a row, up to today" : "practise today to start one", icon: true },
   ];
   return (

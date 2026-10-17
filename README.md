@@ -4,14 +4,46 @@ A free, open-source speaking tutor for the **TCF Canada** oral exam. You talk wi
 **Madame Claire**, an AI tutor who answers in natural French and gives you brief
 corrections as you go.
 
-> Status: milestone 4 of 5. Talk with an animated Claire by voice or text: she lip-syncs
+> Status: milestone 5 of 5. Talk with an animated Claire by voice or text: she lip-syncs
 > her replies, blinks and reacts, and you answer with your microphone. You get live
 > corrections, an English translation of every reply (on click), a Hint button, your
 > level (A1–C1, which also sets how much Claire says) and tu/vous. Sessions are saved with
 > a short note from Claire, your weak points are tracked, and Claire quietly practises
-> them with you. **New:** a timed TCF Canada speaking-test simulation (all 3 tasks or one),
+> them with you. There's a timed TCF Canada speaking-test simulation (all 3 tasks or one),
 > with an estimated score /20 and NCLC level after each task, and a **Feedback Report**
-> with your practice stats, exam score trend and mistake trends. Vocabulary Drill is next.
+> with your practice stats, exam score trend and mistake trends. **New:** a **Vocabulary
+> Drill** with flashcards, fill-in-the-blank and "say it in French", and spaced repetition.
+
+## Vocabulary Drill
+
+Pick **Vocabulary Drill** on the home page:
+
+- **Choose a topic:** Housing, Work, Health, Environment, Technology, Travel, Daily life or
+  Connectors (cependant, en revanche, d'ailleurs, autrement dit…), or **Mixed review**, which
+  starts with the words that are due.
+- **Choose 10, 20 or 30 words.** 10 words take about 3–5 minutes.
+- **Words follow your level** (the level pill): mostly your level, plus a few words from one
+  level above. Every word is tagged A2, B1, B2 or C1.
+- **New words start as flashcards:** read the French, recall the meaning, show it, then mark
+  **Knew it** or **Still learning**. Words you knew come back a few cards later as
+  **fill in the blank** (a French sentence with the word missing) or **say it in French**
+  (the English is given). For nouns, include the article: it's how you learn the gender.
+- **Type or speak** your answers (the microphone works as in the conversation). Small typos
+  and missing accents count as **almost right**, and the correct spelling is always shown.
+- **Claire reads** each word and example sentence aloud (if Sound is on), with a replay button.
+- **Claire's fresh sentences:** for fill-in-the-blank, Claire writes new example sentences
+  (one AI request per drill, for up to 10 words). If the AI is unavailable, or a sentence
+  doesn't really use the word, the drill uses the checked built-in sentence instead.
+- **Spaced repetition:** a missed word comes back tomorrow; each right answer pushes it further
+  away: 1, 3, 7, 16, then 35 days. Your schedule is saved in `sessions/vocab/progress.json`
+  (git ignores it), and **Reset progress** deletes it too.
+- **At the end:** your score, then the words to review, each with its meaning, an example
+  and when it comes back.
+- Drills appear in **Recent sessions** and in the Feedback Report (time, sessions and
+  **Words learned**). Drill mistakes are not grammar mistakes, so they never count as
+  weak points.
+- The words live in `backend/tutor/vocab.py` (about 240, checked by hand). Add more there:
+  the checks at the bottom of the file catch typos when the backend starts.
 
 ## Feedback Report
 
@@ -75,7 +107,7 @@ Notes:
 - Your recorded answers are sent to Groq to be written down, then discarded by this app.
   Whisper writes what you actually said, mistakes included, so Claire can correct them.
 - Your practice history is saved only on your own computer, as JSON files in `sessions/`
-  (git ignores it). Weak points come from the corrections in your last 5 sessions, and
+  (git ignores it). Weak points come from the corrections in your last 5 conversations and exams, and
   **Reset progress** on the home page deletes them all. Each finished session uses one extra
   AI request for Claire's note.
 
@@ -108,9 +140,10 @@ You need Python 3.10+ and Node.js 18+.
 backend/             Python + FastAPI
   server.py          API routes (/api/modes, /api/chat, /api/translate)
   tutor/llm.py       Groq, Gemini and Ollama calls, plus the fallback (the one place to swap AI providers)
+  tutor/vocab.py     Vocabulary Drill words, word choice and the spaced-repetition schedule
   tutor/modes/       one file per practice mode
 web/                 React + Vite + TypeScript
-  src/pages/         Landing and Session pages
+  src/pages/         Landing, Session, Exam, Report and Drill pages
   src/components/    UI pieces (Claire, mode cards, chat bubbles...)
   src/styles/        design tokens (colours, fonts, light/dark)
 ```
@@ -135,7 +168,7 @@ Icons are names from [lucide](https://lucide.dev/icons) (for example `message-ci
 2. ~~Claire speaks; you answer with your microphone~~
 3. ~~Animated Claire (lip-sync, blinking)~~
 4. ~~Saved sessions and a "weak points" memory~~
-5. ~~Timed Exam (TCF Canada simulation)~~, ~~Feedback Report~~, then Vocabulary Drill
+5. ~~Timed Exam (TCF Canada simulation)~~, ~~Feedback Report~~, ~~Vocabulary Drill~~
 
 ## Credits
 

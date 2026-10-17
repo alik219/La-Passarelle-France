@@ -98,8 +98,6 @@ export default function Landing() {
           </div>
         </section>
 
-        <ProgressPanel />
-
         <section className="modes" id="modes">
           <div className="modes__head">
             <div>
@@ -107,7 +105,7 @@ export default function Landing() {
               <h2 className="section-title">Choose your practice mode</h2>
             </div>
             <p className="modes__intro">
-              Begin with a relaxed conversation. More focused ways to practice are coming soon.
+              Chat freely, take a timed TCF exam, drill your vocabulary, or check your progress.
             </p>
           </div>
           {error && <p className="notice notice--error">{error}</p>}
@@ -116,6 +114,8 @@ export default function Landing() {
             {!modes && !error && <p className="muted">Loading practice modes…</p>}
           </div>
         </section>
+
+        <ProgressPanel />
 
         <section className="band" id="about">
           <div className="band__intro">

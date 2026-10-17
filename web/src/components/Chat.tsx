@@ -193,9 +193,20 @@ type ComposerProps = {
   onRecordStart?: () => void; // e.g. stop Claire talking while you speak
   onRecordingChange?: (recording: boolean) => void;
   closed?: boolean; // answering is over (exam time's up): stop recording, no more input
+  autoFocus?: boolean; // focus the box when shown (with a mouse or trackpad; no keyboard pop-up on phones)
+  footnote?: string;
 };
 
-export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingChange, closed = false }: ComposerProps) {
+export function Composer({
+  disabled,
+  hint,
+  onSend,
+  onRecordStart,
+  onRecordingChange,
+  closed = false,
+  autoFocus = false,
+  footnote = "Press Enter to send · Your conversations stay private",
+}: ComposerProps) {
   const [text, setText] = useState("");
   const [showHint, setShowHint] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -231,6 +242,10 @@ export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingCha
     setMicError(null);
     void recorder.start();
   }
+
+  useEffect(() => {
+    if (autoFocus && window.matchMedia("(pointer: fine)").matches) inputRef.current?.focus({ preventScroll: true });
+  }, [autoFocus]);
 
   // Each new question from Claire starts with the hint hidden again.
   useEffect(() => setShowHint(false), [hint]);
@@ -318,7 +333,7 @@ export function Composer({ disabled, hint, onSend, onRecordStart, onRecordingCha
           {micError || recorder.error}
         </p>
       )}
-      <p className="composer__hint">Press Enter to send · Your conversations stay private</p>
+      <p className="composer__hint">{footnote}</p>
     </form>
   );
 }

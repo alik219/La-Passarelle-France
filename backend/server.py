@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-from tutor import exam, focus, memory  # noqa: E402
+from tutor import exam, focus, memory, vocab  # noqa: E402
 from tutor.llm import (  # noqa: E402  (needs .env loaded first)
     LLMError,
     exam_evaluate,
@@ -24,6 +24,7 @@ from tutor.llm import (  # noqa: E402  (needs .env loaded first)
     session_note,
     translate,
     tutor_reply,
+    vocab_sentences,
 )
 from tutor.modes import MODES, ordered  # noqa: E402
 from tutor.modes.base import Address, Level  # noqa: E402
@@ -180,11 +181,12 @@ async def save_session(req: SessionRequest):
 @app.get("/api/progress")
 def progress():
     """Top weak points (from the last 5 sessions) and the most recent sessions."""
-    return {"weak_points": memory.weak_points(top=3), "sessions": memory.recent(limit=5)}
+    return {"weak_points": memory.weak_points(top=3), "sessions": memory.recent(limit=5), "vocab": vocab.summary()}
 
 
 @app.delete("/api/progress")
 def reset_progress():
+    vocab.reset_progress()  # the word review schedule goes too
     return {"removed": memory.reset()}
 
 
@@ -305,6 +307,97 @@ def exam_save(req: ExamSaveRequest):
         f"{scores}. Estimated overall {overall}/20 ({exam.nclc(overall)}).",
     }
     return {"saved": True, **memory.save(session)}
+
+
+# ---------- Vocabulary Drill ----------
+
+MAX_AI_SENTENCES = 10  # per request: keeps one call well inside Groq's per-minute token limit
+
+
+@app.get("/api/vocab/topics")
+def vocab_topics(level: Level = "A2"):
+    """Topic cards, with how many words are due for review and how many are new."""
+    return vocab.topics(level)
+
+
+@app.get("/api/vocab/drill")
+def vocab_drill(topic: str, count: int = 10, level: Level = "A2"):
+    """The words for one drill: due words first, then new words at your level (plus a few above)."""
+    if topic not in vocab.TOPIC_BY_ID:
+        raise HTTPException(404, "Unknown topic.")
+    if count not in (10, 20, 30):
+        raise HTTPException(422, "count must be 10, 20 or 30")
+    return {"topic": vocab.TOPIC_BY_ID[topic], "words": vocab.pick(topic, count, level)}
+
+
+class VocabExtrasRequest(BaseModel):
+    level: Level = "A2"
+    ids: list[str] = Field(max_length=MAX_AI_SENTENCES)
+
+
+@app.post("/api/vocab/extras")
+async def vocab_extras(req: VocabExtrasRequest):
+    """Claire's fresh fill-in sentences. Words she gets wrong (or an AI failure) keep the built-in example."""
+    words = [vocab.BY_ID[i] for i in req.ids if i in vocab.BY_ID]
+    if not words:
+        return {"sentences": {}}
+    try:
+        items = await vocab_sentences(req.level, words)
+    except LLMError:
+        return {"sentences": {}}  # the drill simply uses the checked built-in sentences
+    out = {}
+    for item in items:
+        word = vocab.BY_ID.get(item.get("id", ""))
+        example = word and vocab.ai_example(word, item.get("sentence", ""), item.get("answer", ""))
+        if example and word["id"] in req.ids:
+            out[word["id"]] = {"example": example, "example_en": (item.get("translation") or "").strip()}
+    return {"sentences": out}
+
+
+class VocabResult(BaseModel):
+    id: str = Field(max_length=80)
+    correct: bool
+    almost: bool = False  # right apart from a typo or accents (counts as right)
+
+
+class VocabFinishRequest(BaseModel):
+    id: str
+    started_at: str = Field(max_length=40)
+    topic: str = Field(max_length=32)
+    level: Level = "A2"
+    results: list[VocabResult] = Field(min_length=1, max_length=30)
+
+
+@app.post("/api/vocab/finish")
+def vocab_finish(req: VocabFinishRequest):
+    """Save a finished drill: update the review schedule and add it to your sessions."""
+    if not memory.valid_id(req.id):
+        raise HTTPException(422, "Invalid session id.")
+    if req.topic not in vocab.TOPIC_BY_ID:
+        raise HTTPException(404, "Unknown topic.")
+    results = [r for r in req.results if r.id in vocab.BY_ID]
+    if not results:
+        raise HTTPException(422, "No known words in this drill.")
+    previous = memory.load(req.id)
+    if previous and previous.get("drill"):
+        schedule = previous["drill"].get("schedule", {})  # saved already (e.g. a retry): don't count twice
+    else:
+        schedule = vocab.record([r.model_dump() for r in results])
+    words = [{"id": r.id, "fr": vocab.BY_ID[r.id]["fr"], "correct": r.correct, "almost": r.almost} for r in results]
+    title = vocab.TOPIC_BY_ID[req.topic]["title"]
+    session = {
+        "id": req.id,
+        "mode": vocab.DRILL_MODE,
+        "level": req.level,
+        "address": "vous",
+        "started_at": req.started_at,
+        "ended_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "messages": [],  # no conversation, so no corrections: drill misses are not grammar weak points
+        "drill": {"topic": req.topic, "topic_title": title, "total": len(words),
+                  "correct": sum(w["correct"] for w in words), "words": words, "schedule": schedule},
+        "note": vocab.note(title, words),
+    }
+    return {"saved": True, "schedule": schedule, **memory.save(session)}
 
 
 # In production, serve the built website from web/dist.

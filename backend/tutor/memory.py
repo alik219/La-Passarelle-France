@@ -16,6 +16,7 @@ SESSIONS_DIR = Path(
     os.getenv("SESSIONS_DIR") or Path(__file__).resolve().parent.parent.parent / "sessions"
 )
 RECENT_SESSIONS = 5  # weak points come from this many latest sessions
+DRILL_MODE = "vocabulary-drill"  # vocabulary drills have no corrections, so they never count as weak points
 _ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 # Shown to the learner and to Claire.
@@ -99,7 +100,16 @@ def stats(session: dict) -> dict:
         ],
         "note": session.get("note"),
         "exam": session.get("exam"),  # score and NCLC for exam simulations, else None
+        "drill": _drill_stats(session),  # topic and score for vocabulary drills, else None
     }
+
+
+def _drill_stats(session: dict) -> dict | None:
+    drill = session.get("drill")
+    if not isinstance(drill, dict):
+        return None
+    return {"topic": drill.get("topic"), "topic_title": drill.get("topic_title"),
+            "total": drill.get("total", 0), "correct": drill.get("correct", 0)}
 
 
 def save(session: dict) -> dict:
@@ -115,7 +125,8 @@ def weak_points(top: int | None = 3) -> list[dict]:
     """Most frequent correction categories over the last few sessions, with an example each."""
     counts: Counter = Counter()
     examples: dict[str, dict] = {}
-    for session in _all_sessions()[:RECENT_SESSIONS]:
+    # Vocabulary drills don't use up the window: weak points are about grammar in what you say.
+    for session in [s for s in _all_sessions() if s.get("mode") != DRILL_MODE][:RECENT_SESSIONS]:
         for c in corrections_of(session):
             cat = c.get("category") or "other"
             counts[cat] += 1
@@ -197,6 +208,7 @@ def report(period_days: int | None) -> dict:
     examples: dict[str, dict] = {}
     seconds = messages = 0
     exams = []
+    word_results: dict[str, bool] = {}  # word id -> right at its latest drill in the period
     for s in sessions:
         st = stats(s)
         seconds += st["duration_seconds"]
@@ -208,6 +220,9 @@ def report(period_days: int | None) -> dict:
                 per_bucket[idx][cat] += 1
             per_category[cat] += 1
             examples[cat] = {"original": c.get("original", ""), "corrected": c.get("corrected", "")}  # latest wins
+        for w in (s.get("drill") or {}).get("words", []):
+            if isinstance(w, dict) and w.get("id"):
+                word_results[w["id"]] = bool(w.get("correct"))  # oldest first, so the latest wins
         if s.get("exam"):
             ex = s["exam"]
             exams.append({
@@ -223,8 +238,10 @@ def report(period_days: int | None) -> dict:
         "stats": {
             "seconds": seconds,
             "sessions": len(sessions),
-            "conversations": sum(1 for s in sessions if not s.get("exam")),
+            "conversations": sum(1 for s in sessions if not s.get("exam") and s.get("mode") != DRILL_MODE),
             "exams": len(exams),
+            "drills": sum(1 for s in sessions if s.get("mode") == DRILL_MODE),
+            "words_learned": sum(word_results.values()),
             "messages": messages,
             "corrections": sum(per_category.values()),
             "active_days": len({_day(s) for s in sessions}),
